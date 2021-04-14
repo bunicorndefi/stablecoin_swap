@@ -1,0 +1,68 @@
+{
+  "name": "@bunicorn/stable-coins-core",
+  "version": "1.0.1",
+  "description": "This repository has the contracts for the BuniCorn protocol.",
+  "license": "BUSL-1.1",
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "stable-coins-core",
+    "bunicorn",
+    "ethereum"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bunicorn/stable-coins-core.git"
+  },
+  "directories": {
+    "test": "test"
+  },
+  "files": [
+    "contracts/interfaces",
+    "contracts/libraries",
+    "artifacts/contracts/BuniCornPool.sol/BuniCornPool.json",
+    "artifacts/contracts/BuniCornFactory.sol/BuniCornFactory.json",
+    "artifacts/contracts/periphery/BuniCornRouter02.sol/BuniCornRouter02.json",
+    "artifacts/contracts/interfaces/**/*.json",
+    "!artifacts/contracts/interfaces/**/*.dbg.json"
+  ],
+  "scripts": {
+    "compile": "yarn hardhat compile && yarn hardhat size-contracts",
+    "test": "yarn hardhat test --no-compile",
+    "solhint": "./node_modules/.bin/solhint -f table 'contracts/**/*.sol'",
+    "prettier": "./node_modules/.bin/prettier --write contracts/",
+    "lint": "./node_modules/.bin/solhint -f table 'contracts/**/*.sol'",
+    "coverage": "./coverage.sh"
+  },
+  "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "2.0.0",
+    "@nomiclabs/hardhat-etherscan": "^2.0.1",
+    "@nomiclabs/hardhat-ganache": "2.0.0",
+    "@nomiclabs/hardhat-truffle5": "2.0.0",
+    "@nomiclabs/hardhat-web3": "2.0.0",
+    "@openzeppelin/test-helpers": "0.5.6",
+    "chai": "4.2.0",
+    "chai-as-promised": "7.1.1",
+    "chai-bn": "0.2.1",
+    "dotenv": "8.2.0",
+    "hardhat": "2.0.3",
+    "hardhat-contract-sizer": "2.0.2",
+    "husky": "4.3.0",
+    "prettier": "2.0.2",
+    "prettier-plugin-solidity": "1.0.0-alpha.54",
+    "solhint": "3.2.0",
+    "solhint-plugin-prettier": "0.0.4",
+    "solidity-coverage": "0.7.12",
+    "typescript": "3.9.7",
+    "web3": "1.2.6",
+    "@uniswap/lib": "1.1.1",
+    "@uniswap/v2-periphery": "1.1.0-beta.0",
+    "ethers": "5.0.0",
+    "web3-eth-abi": "1.2.11"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "3.4.1",
+    "bignumber.js": "^9.0.1"
+  }
+}
