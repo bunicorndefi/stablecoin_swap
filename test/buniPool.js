@@ -12,6 +12,8 @@ const {expandTo18Decimals, precisionUnits} = require('./helper');
 
 const MINIMUM_LIQUIDITY = new BN(1000);
 
+let owner;
+let admin;
 let token0;
 let token1;
 let factory;
@@ -28,11 +30,12 @@ let baseRate = new BN(0);
 
 contract('BuniCornPool', function (accounts) {
   before('setup', async () => {
-    admin = accounts[0];
-    trader = accounts[1];
-    app = accounts[2];
-    liquidityProvider = accounts[3];
-    feeTo = accounts[4];
+    owner = accounts[0];
+    admin = accounts[1];
+    trader = accounts[2];
+    app = accounts[3];
+    liquidityProvider = accounts[4];
+    feeTo = accounts[5];
     let tokenA = await TestToken.new('test token A', 'A', Helper.MaxUint256);
     let tokenB = await TestToken.new('test token B', 'B', Helper.MaxUint256);
     [token0, token1] = new BN(tokenA.address).lt(new BN(tokenB.address)) ? [tokenA, tokenB] : [tokenB, tokenA];
@@ -40,8 +43,8 @@ contract('BuniCornPool', function (accounts) {
 
   it('name & symbol', async () => {
     [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps);
-    assert(await pool.symbol(), `BUNI-LP ${await token0.symbol()} ${await token1.symbol()}`, 'unexpected symbol');
-    assert(await pool.name(), `BuniCorn LP ${await token0.symbol()} ${await token1.symbol()}`, 'unexpected name');
+    assert(await pool.symbol(), `BPT ${await token0.symbol()} ${await token1.symbol()}`, 'unexpected symbol');
+    assert(await pool.name(), `Buni Pool Token ${await token0.symbol()} ${await token1.symbol()}`, 'unexpected name');
   });
 
   it('can not initialize not by factory', async () => {
@@ -571,7 +574,7 @@ contract('BuniCornPool', function (accounts) {
       const governmentFeeBps = new BN(1000);
 
       [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps);
-      await factory.setFeeConfiguration(feeTo, governmentFeeBps, {from: accounts[0]});
+      await factory.setFeeConfiguration(feeTo, governmentFeeBps, {from: admin});
       await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
       let totalSuppy = await pool.totalSupply();
 
@@ -599,7 +602,7 @@ contract('BuniCornPool', function (accounts) {
       Helper.assertEqual(await pool.balanceOf(feeTo), fee);
 
       // disable fee again
-      await factory.setFeeConfiguration(constants.ZERO_ADDRESS, governmentFeeBps, {from: accounts[0]});
+      await factory.setFeeConfiguration(constants.ZERO_ADDRESS, governmentFeeBps, {from: admin});
       await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
 
       tradeInfo = await pool.getTradeInfo();
@@ -620,7 +623,7 @@ contract('BuniCornPool', function (accounts) {
       const governmentFeeBps = new BN(1000);
 
       [factory, pool] = await setupPool(admin, token0, token1, ampBps);
-      await factory.setFeeConfiguration(feeTo, governmentFeeBps, {from: accounts[0]});
+      await factory.setFeeConfiguration(feeTo, governmentFeeBps, {from: admin});
       await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
       let totalSuppy = await pool.totalSupply();
 
@@ -648,7 +651,7 @@ contract('BuniCornPool', function (accounts) {
       Helper.assertEqual(await pool.balanceOf(feeTo), fee);
 
       // disable fee again
-      await factory.setFeeConfiguration(constants.ZERO_ADDRESS, governmentFeeBps, {from: accounts[0]});
+      await factory.setFeeConfiguration(constants.ZERO_ADDRESS, governmentFeeBps, {from: admin});
       await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
 
       tradeInfo = await pool.getTradeInfo();
@@ -679,7 +682,7 @@ contract('BuniCornPool', function (accounts) {
       Helper.assertEqual(await pool.totalSupply(), MINIMUM_LIQUIDITY);
       Helper.assertEqual(await pool.kLast(), new BN(0));
       // turn on fee.
-      await factory.setFeeConfiguration(feeTo, new BN(1000));
+      await factory.setFeeConfiguration(feeTo, new BN(1000), { from: admin });
       await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
       Helper.assertGreater(await pool.kLast(), new BN(0));
       Helper.assertEqual(await pool.balanceOf(feeTo), new BN(0));
@@ -784,13 +787,13 @@ async function assertTokenPoolBalances (token0, token1, user, expectedBalances) 
 }
 
 async function setupFactory (admin) {
-  return await BuniCornFactory.new(admin);
+  return await BuniCornFactory.new(admin, { from: owner });
 }
 
 async function setupPool (admin, tokenA, tokenB, ampBps) {
   let factory = await setupFactory(admin);
 
-  await factory.createPool(tokenA.address, tokenB.address, ampBps);
+  await factory.createPool(tokenA.address, tokenB.address, ampBps, { from: owner });
   const poolAddrs = await factory.getPools(tokenA.address, tokenB.address);
   const pool = await BuniCornPool.at(poolAddrs[0]);
 

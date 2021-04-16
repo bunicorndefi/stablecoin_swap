@@ -28,7 +28,7 @@ contract FeeTo is DaoOperator, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
-    IBuniCornDao public immutable kyberDao;
+    IBuniCornDao public immutable buniDao;
 
     mapping(uint256 => mapping(IERC20 => uint256)) public rewardsPerEpoch;
     mapping(uint256 => mapping(IERC20 => uint256)) public rewardsPaidPerEpoch;
@@ -48,10 +48,10 @@ contract FeeTo is DaoOperator, ReentrancyGuard {
     );
     event SetAllowedToken(IERC20 token, bool isAllowed);
 
-    constructor(IBuniCornDao _kyberDao, address _daoOperator) public DaoOperator(_daoOperator) {
-        require(_kyberDao != IBuniCornDao(0), "_kyberDao 0");
+    constructor(IBuniCornDao _buniDao, address _daoOperator) public DaoOperator(_daoOperator) {
+        require(_buniDao != IBuniCornDao(0), "_buniDao 0");
 
-        kyberDao = _kyberDao;
+        buniDao = _buniDao;
     }
 
     function setAllowedToken(IERC20 token, bool isAllowed) external onlyDaoOperator {
@@ -64,7 +64,7 @@ contract FeeTo is DaoOperator, ReentrancyGuard {
         if (!allowedToken[token]) {
             return;
         }
-        uint256 lastEpoch = kyberDao.getCurrentEpochNumber() - 1;
+        uint256 lastEpoch = buniDao.getCurrentEpochNumber() - 1;
         // epoch mut be last epoch
         if (epoch != lastEpoch) {
             return;
@@ -113,8 +113,8 @@ contract FeeTo is DaoOperator, ReentrancyGuard {
 
         // the relative part of the reward the staker is entitled to for the epoch.
         // units Precision: 10 ** 18 = 100%
-        // if the epoch is current or in the future, kyberDao will return 0 as result
-        uint256 percentageInPrecision = kyberDao.getPastEpochRewardPercentageInPrecision(
+        // if the epoch is current or in the future, buniDao will return 0 as result
+        uint256 percentageInPrecision = buniDao.getPastEpochRewardPercentageInPrecision(
             staker,
             epoch
         );
@@ -144,11 +144,11 @@ contract FeeTo is DaoOperator, ReentrancyGuard {
     }
 
     function getCurrentEpochNumber() internal view returns (uint256 epoch) {
-        IBuniCornDao _kyberDao = kyberDao;
-        if (_kyberDao == IBuniCornDao(0)) {
+        IBuniCornDao _buniDao = buniDao;
+        if (_buniDao == IBuniCornDao(0)) {
             return 0;
         } else {
-            return _kyberDao.getCurrentEpochNumber();
+            return _buniDao.getCurrentEpochNumber();
         }
     }
 }

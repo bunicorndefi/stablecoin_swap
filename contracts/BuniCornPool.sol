@@ -273,13 +273,13 @@ contract BuniCornPool is IBuniCornPool, ERC20Permit, ReentrancyGuard, VolumeTren
     function name() public override view returns (string memory) {
         IERC20Metadata _token0 = IERC20Metadata(address(token0));
         IERC20Metadata _token1 = IERC20Metadata(address(token1));
-        return string(abi.encodePacked("BuniCorn LP ", _token0.symbol(), "-", _token1.symbol()));
+        return string(abi.encodePacked("Buni Pool Token ", _token0.symbol(), "-", _token1.symbol()));
     }
 
     function symbol() public override view returns (string memory) {
         IERC20Metadata _token0 = IERC20Metadata(address(token0));
         IERC20Metadata _token1 = IERC20Metadata(address(token1));
-        return string(abi.encodePacked("BUNI-LP ", _token0.symbol(), "-", _token1.symbol()));
+        return string(abi.encodePacked("BPT ", _token0.symbol(), "-", _token1.symbol()));
     }
 
     function verifyBalanceAndUpdateEma(

@@ -14,6 +14,7 @@ const TestToken = artifacts.require('TestToken');
 
 const bigAmount = new BN(2).pow(new BN(250));
 
+let owner;
 let trader;
 let feeToSetter;
 let feeTo;
@@ -35,13 +36,14 @@ const MaxUint256 = new BN(2).pow(new BN(256)).sub(BNOne);
 
 contract('BuniCornRouter', function (accounts) {
   before('setup', async () => {
-    feeToSetter = accounts[0];
-    trader = accounts[1];
-    app = accounts[2];
-    liquidityProvider = accounts[3];
+    owner = accounts[0];
+    feeToSetter = accounts[1];
+    trader = accounts[2];
+    app = accounts[3];
+    liquidityProvider = accounts[4];
     // key from hardhat.config.js
-    liquidityProviderPkKey = '0xee9d129c1997549ee09c0757af5939b2483d80ad649a0eda68e8b0357ad11131';
-    feeTo = accounts[4];
+    liquidityProviderPkKey = '0x87630b2d1de0fbd5044eb6891b3d9d98c34c8d310c852f98550ba774480e47cc';
+    feeTo = accounts[5];
 
     let tokenA = await TestToken.new('test token A', 'A', Helper.expandTo18Decimals(100000));
     let tokenB = await TestToken.new('test token B', 'B', Helper.expandTo18Decimals(100000));
@@ -55,7 +57,7 @@ contract('BuniCornRouter', function (accounts) {
   });
 
   beforeEach('setup', async () => {
-    factory = await BuniCornFactory.new(accounts[0]);
+    factory = await BuniCornFactory.new(feeToSetter);
     /// create pool tokenA and tokenB
     await factory.createPool(token0.address, token1.address, new BN(10000));
     const poolAddrs = await factory.getPools(token0.address, token1.address);
@@ -65,7 +67,8 @@ contract('BuniCornRouter', function (accounts) {
     const wethPoolAddresses = await factory.getPools(weth.address, ethPartner.address);
     ethPool = await BuniCornPool.at(wethPoolAddresses[0]);
     /// create router
-    router = await BuniCornRouter.new(factory.address, weth.address);
+    router = await BuniCornRouter.new(factory.address, weth.address, { from: owner });
+    await factory.setRouter(router.address, { from: owner });
   });
 
   it('factory, ETH', async () => {
@@ -77,14 +80,31 @@ contract('BuniCornRouter', function (accounts) {
     it('addLiquidityNewPool', async () => {
       let tokenA = await TestToken.new('test token A', 'A', Helper.expandTo18Decimals(10000));
       let tokenB = await TestToken.new('test token B', 'B', Helper.expandTo18Decimals(10000));
-      tokenA.transfer(trader, initTokenAmount);
-      tokenB.transfer(trader, initTokenAmount);
+      // tokenA.transfer(trader, initTokenAmount);
+      // tokenB.transfer(trader, initTokenAmount);
 
-      await tokenA.approve(router.address, bigAmount, {from: trader});
-      await tokenB.approve(router.address, bigAmount, {from: trader});
+      await tokenA.approve(router.address, bigAmount, {from: owner});
+      await tokenB.approve(router.address, bigAmount, {from: owner});
 
       const tokenAAmount = Helper.expandTo18Decimals(1);
       const tokenBAmount = Helper.expandTo18Decimals(4);
+
+      await expectRevert(
+        router.addLiquidityNewPool(
+          tokenA.address,
+          tokenB.address,
+          new BN(20000),
+          tokenAAmount,
+          tokenBAmount,
+          0,
+          0,
+          liquidityProvider,
+          bigAmount,
+          {from: trader}
+        ),
+        'Ownable: caller is not the owner'
+      );
+
       // amp-pool
       let result = await router.addLiquidityNewPool(
         tokenA.address,
@@ -96,7 +116,7 @@ contract('BuniCornRouter', function (accounts) {
         0,
         liquidityProvider,
         bigAmount,
-        {from: trader}
+        {from: owner}
       );
       let poolAddresses = await factory.getPools(tokenA.address, tokenB.address);
       let pool = await BuniCornPool.at(poolAddresses[0]);
@@ -120,7 +140,7 @@ contract('BuniCornRouter', function (accounts) {
         0,
         liquidityProvider,
         bigAmount,
-        {from: trader}
+        {from: owner}
       );
       poolAddresses = await factory.getPools(tokenA.address, tokenB.address);
       pool = await BuniCornPool.at(poolAddresses[1]);
@@ -140,7 +160,7 @@ contract('BuniCornRouter', function (accounts) {
         0,
         liquidityProvider,
         bigAmount,
-        {from: trader}
+        {from: owner}
       );
       poolAddresses = await factory.getPools(tokenA.address, tokenB.address);
       Helper.assertEqual(poolAddresses.length, 2);
@@ -148,12 +168,27 @@ contract('BuniCornRouter', function (accounts) {
 
     it('addLiquidityNewPoolETH', async () => {
       let token = await TestToken.new('test token A', 'A', Helper.expandTo18Decimals(10000));
-      token.transfer(trader, initTokenAmount);
+      // token.transfer(trader, initTokenAmount);
 
-      await token.approve(router.address, bigAmount, {from: trader});
+      await token.approve(router.address, bigAmount, {from: owner});
 
       const tokenAmount = Helper.expandTo18Decimals(1);
       const ethAmount = Helper.expandTo18Decimals(4);
+
+      await expectRevert(
+        router.addLiquidityNewPoolETH(
+          token.address,
+          new BN(20000),
+          tokenAmount,
+          0,
+          0,
+          liquidityProvider,
+          bigAmount,
+          {from: trader, value: ethAmount}
+        ),
+        'Ownable: caller is not the owner'
+      );
+
       // amp-pool
       let result = await router.addLiquidityNewPoolETH(
         token.address,
@@ -163,7 +198,7 @@ contract('BuniCornRouter', function (accounts) {
         0,
         liquidityProvider,
         bigAmount,
-        {from: trader, value: ethAmount}
+        {from: owner, value: ethAmount}
       );
       let poolAddresses = await factory.getPools(token.address, weth.address);
       let pool = await BuniCornPool.at(poolAddresses[0]);
@@ -185,7 +220,7 @@ contract('BuniCornRouter', function (accounts) {
         0,
         liquidityProvider,
         bigAmount,
-        {from: trader, value: ethAmount}
+        {from: owner, value: ethAmount}
       );
       poolAddresses = await factory.getPools(token.address, weth.address);
       pool = await BuniCornPool.at(poolAddresses[1]);
@@ -203,7 +238,7 @@ contract('BuniCornRouter', function (accounts) {
         0,
         liquidityProvider,
         bigAmount,
-        {from: trader, value: ethAmount}
+        {from: owner, value: ethAmount}
       );
       poolAddresses = await factory.getPools(token.address, weth.address);
       Helper.assertEqual(poolAddresses.length, 2);

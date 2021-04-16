@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.6.12;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 
 import "./interfaces/IBuniCornFactory.sol";
 import "./BuniCornPool.sol";
 
-contract BuniCornFactory is IBuniCornFactory {
+contract BuniCornFactory is Ownable, IBuniCornFactory {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     uint256 internal constant BPS = 10000;
@@ -18,6 +19,9 @@ contract BuniCornFactory is IBuniCornFactory {
     mapping(IERC20 => mapping(IERC20 => EnumerableSet.AddressSet)) internal tokenPools;
     mapping(IERC20 => mapping(IERC20 => address)) public override getUnamplifiedPool;
     address[] public override allPools;
+
+    // set router to initialize new pool
+    address public routerAddress;
 
     event PoolCreated(
         IERC20 indexed token0,
@@ -33,11 +37,19 @@ contract BuniCornFactory is IBuniCornFactory {
         feeToSetter = _feeToSetter;
     }
 
+    // *notes*: set router address which allow to create new pool
+    function setRouter(address _router) external onlyOwner {
+        require(_router != address(0), "BUNI: ZERO_ADDRESS");
+        routerAddress = _router;
+    }
+
+    // *notes*: allow contract owner or router address to create new pool
     function createPool(
         IERC20 tokenA,
         IERC20 tokenB,
         uint32 ampBps
     ) external override returns (address pool) {
+        require(msg.sender == owner() || msg.sender == routerAddress, "BUNI: FORBIDDEN");
         require(tokenA != tokenB, "BUNI: IDENTICAL_ADDRESSES");
         (IERC20 token0, IERC20 token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
         require(address(token0) != address(0), "BUNI: ZERO_ADDRESS");

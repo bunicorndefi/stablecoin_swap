@@ -2,6 +2,7 @@
 pragma solidity 0.6.12;
 
 import "@uniswap/lib/contracts/libraries/TransferHelper.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
@@ -12,7 +13,7 @@ import "../interfaces/IBuniCornPool.sol";
 import "../interfaces/IWETH.sol";
 import "../libraries/BuniCornLibrary.sol";
 
-contract BuniCornRouter02 is IBuniCornRouter02 {
+contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
     using SafeERC20 for IERC20;
     using SafeERC20 for IWETH;
     using SafeMath for uint256;
@@ -139,6 +140,7 @@ contract BuniCornRouter02 is IBuniCornRouter02 {
         }
     }
 
+    // *notes*: only allow the contract owner to create new pool
     function addLiquidityNewPool(
         IERC20 tokenA,
         IERC20 tokenB,
@@ -152,6 +154,7 @@ contract BuniCornRouter02 is IBuniCornRouter02 {
     )
         external
         override
+        onlyOwner
         returns (
             uint256 amountA,
             uint256 amountB,
@@ -178,6 +181,7 @@ contract BuniCornRouter02 is IBuniCornRouter02 {
         );
     }
 
+    // *notes*: only allow the contract owner to create new pool
     function addLiquidityNewPoolETH(
         IERC20 token,
         uint32 ampBps,
@@ -190,6 +194,7 @@ contract BuniCornRouter02 is IBuniCornRouter02 {
         external
         override
         payable
+        onlyOwner
         returns (
             uint256 amountToken,
             uint256 amountETH,
