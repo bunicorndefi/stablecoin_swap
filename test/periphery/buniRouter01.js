@@ -8,7 +8,7 @@ const {ecsign} = require('ethereumjs-util');
 
 const BuniCornRouter = artifacts.require('BuniCornRouter02');
 const BuniCornFactory = artifacts.require('BuniCornFactory');
-const WETH = artifacts.require('WETH9');
+const WBNB = artifacts.require('WBNB9');
 const BuniCornPool = artifacts.require('BuniCornPool');
 const TestToken = artifacts.require('TestToken');
 
@@ -24,9 +24,9 @@ let app;
 let factory;
 let token0;
 let token1;
-let ethPartner;
-let ethPool;
-let weth;
+let bnbPartner;
+let bnbPool;
+let wbnb;
 
 let router;
 let pool;
@@ -51,9 +51,9 @@ contract('BuniCornRouter', function (accounts) {
     tokenB.transfer(trader, initTokenAmount);
     [token0, token1] = new BN(tokenA.address).lt(new BN(tokenB.address)) ? [tokenA, tokenB] : [tokenB, tokenA];
 
-    weth = await WETH.new();
-    ethPartner = await TestToken.new('WETH Partner', 'WETH-P', Helper.expandTo18Decimals(100000));
-    await ethPartner.transfer(trader, initTokenAmount);
+    wbnb = await WBNB.new();
+    bnbPartner = await TestToken.new('WBNB Partner', 'WBNB-P', Helper.expandTo18Decimals(100000));
+    await bnbPartner.transfer(trader, initTokenAmount);
   });
 
   beforeEach('setup', async () => {
@@ -62,18 +62,18 @@ contract('BuniCornRouter', function (accounts) {
     await factory.createPool(token0.address, token1.address, new BN(10000));
     const poolAddrs = await factory.getPools(token0.address, token1.address);
     pool = await BuniCornPool.at(poolAddrs[0]);
-    /// create pool weth and ethPartner
-    await factory.createPool(weth.address, ethPartner.address, new BN(10000));
-    const wethPoolAddresses = await factory.getPools(weth.address, ethPartner.address);
-    ethPool = await BuniCornPool.at(wethPoolAddresses[0]);
+    /// create pool wbnb and bnbPartner
+    await factory.createPool(wbnb.address, bnbPartner.address, new BN(10000));
+    const wbnbPoolAddresses = await factory.getPools(wbnb.address, bnbPartner.address);
+    bnbPool = await BuniCornPool.at(wbnbPoolAddresses[0]);
     /// create router
-    router = await BuniCornRouter.new(factory.address, weth.address, { from: owner });
+    router = await BuniCornRouter.new(factory.address, wbnb.address, { from: owner });
     await factory.setRouter(router.address, { from: owner });
   });
 
-  it('factory, ETH', async () => {
+  it('factory, BNB', async () => {
     Helper.assertEqual(await router.factory(), factory.address);
-    Helper.assertEqual(await router.weth(), weth.address);
+    Helper.assertEqual(await router.wbnb(), wbnb.address);
   });
 
   describe('addLiquidity', async () => {
@@ -166,17 +166,17 @@ contract('BuniCornRouter', function (accounts) {
       Helper.assertEqual(poolAddresses.length, 2);
     });
 
-    it('addLiquidityNewPoolETH', async () => {
+    it('addLiquidityNewPoolBNB', async () => {
       let token = await TestToken.new('test token A', 'A', Helper.expandTo18Decimals(10000));
       // token.transfer(trader, initTokenAmount);
 
       await token.approve(router.address, bigAmount, {from: owner});
 
       const tokenAmount = Helper.expandTo18Decimals(1);
-      const ethAmount = Helper.expandTo18Decimals(4);
+      const bnbAmount = Helper.expandTo18Decimals(4);
 
       await expectRevert(
-        router.addLiquidityNewPoolETH(
+        router.addLiquidityNewPoolBNB(
           token.address,
           new BN(20000),
           tokenAmount,
@@ -184,13 +184,13 @@ contract('BuniCornRouter', function (accounts) {
           0,
           liquidityProvider,
           bigAmount,
-          {from: trader, value: ethAmount}
+          {from: trader, value: bnbAmount}
         ),
         'Ownable: caller is not the owner'
       );
 
       // amp-pool
-      let result = await router.addLiquidityNewPoolETH(
+      let result = await router.addLiquidityNewPoolBNB(
         token.address,
         new BN(20000),
         tokenAmount,
@@ -198,21 +198,21 @@ contract('BuniCornRouter', function (accounts) {
         0,
         liquidityProvider,
         bigAmount,
-        {from: owner, value: ethAmount}
+        {from: owner, value: bnbAmount}
       );
-      let poolAddresses = await factory.getPools(token.address, weth.address);
+      let poolAddresses = await factory.getPools(token.address, wbnb.address);
       let pool = await BuniCornPool.at(poolAddresses[0]);
       const token0Address = await pool.token0();
       console.log('gas used', result.receipt.gasUsed);
       await expectEvent.inTransaction(result.tx, pool, 'Sync', {
-        reserve0: token.address == token0Address ? tokenAmount : ethAmount,
-        reserve1: token.address == token0Address ? ethAmount : tokenAmount
+        reserve0: token.address == token0Address ? tokenAmount : bnbAmount,
+        reserve1: token.address == token0Address ? bnbAmount : tokenAmount
       });
-      const expectedLiquidity = Helper.sqrt(tokenAmount.mul(ethAmount)).sub(MINIMUM_LIQUIDITY);
+      const expectedLiquidity = Helper.sqrt(tokenAmount.mul(bnbAmount)).sub(MINIMUM_LIQUIDITY);
       Helper.assertEqual(await pool.balanceOf(liquidityProvider), expectedLiquidity, 'unexpected liquidity');
 
       // unamplified pool
-      result = await router.addLiquidityNewPoolETH(
+      result = await router.addLiquidityNewPoolBNB(
         token.address,
         new BN(10000),
         tokenAmount,
@@ -220,17 +220,17 @@ contract('BuniCornRouter', function (accounts) {
         0,
         liquidityProvider,
         bigAmount,
-        {from: owner, value: ethAmount}
+        {from: owner, value: bnbAmount}
       );
-      poolAddresses = await factory.getPools(token.address, weth.address);
+      poolAddresses = await factory.getPools(token.address, wbnb.address);
       pool = await BuniCornPool.at(poolAddresses[1]);
       await expectEvent.inTransaction(result.tx, pool, 'Sync', {
-        reserve0: token.address == token0Address ? tokenAmount : ethAmount,
-        reserve1: token.address == token0Address ? ethAmount : tokenAmount
+        reserve0: token.address == token0Address ? tokenAmount : bnbAmount,
+        reserve1: token.address == token0Address ? bnbAmount : tokenAmount
       });
       Helper.assertEqual(await pool.balanceOf(liquidityProvider), expectedLiquidity, 'unexpected liquidity');
       // addliquidity for unamplified again
-      result = await router.addLiquidityNewPoolETH(
+      result = await router.addLiquidityNewPoolBNB(
         token.address,
         new BN(10000),
         tokenAmount,
@@ -238,9 +238,9 @@ contract('BuniCornRouter', function (accounts) {
         0,
         liquidityProvider,
         bigAmount,
-        {from: owner, value: ethAmount}
+        {from: owner, value: bnbAmount}
       );
-      poolAddresses = await factory.getPools(token.address, weth.address);
+      poolAddresses = await factory.getPools(token.address, wbnb.address);
       Helper.assertEqual(poolAddresses.length, 2);
     });
 
@@ -282,7 +282,7 @@ contract('BuniCornRouter', function (accounts) {
         router.addLiquidity(
           token0.address,
           token1.address,
-          ethPartner.address,
+          bnbPartner.address,
           Helper.expandTo18Decimals(2),
           Helper.expandTo18Decimals(2),
           expectedToken0Amount.add(new BN(1)),
@@ -368,86 +368,86 @@ contract('BuniCornRouter', function (accounts) {
       });
     });
 
-    it('addLiquidityETH', async () => {
-      const ethPartnerAmount = Helper.expandTo18Decimals(1);
-      const ethAmount = Helper.expandTo18Decimals(4);
+    it('addLiquidityBNB', async () => {
+      const bnbPartnerAmount = Helper.expandTo18Decimals(1);
+      const bnbAmount = Helper.expandTo18Decimals(4);
 
       const expectedLiquidity = Helper.expandTo18Decimals(2);
-      const token0 = await ethPool.token0();
-      await ethPartner.approve(router.address, bigAmount, {from: trader});
+      const token0 = await bnbPool.token0();
+      await bnbPartner.approve(router.address, bigAmount, {from: trader});
 
       await expectRevert(
-        router.addLiquidityETH(
-          ethPartner.address,
+        router.addLiquidityBNB(
+          bnbPartner.address,
           pool.address,
-          ethPartnerAmount,
-          ethPartnerAmount,
-          ethAmount,
+          bnbPartnerAmount,
+          bnbPartnerAmount,
+          bnbAmount,
           trader,
           bigAmount,
-          {from: trader, value: ethAmount.add(new BN(100))}
+          {from: trader, value: bnbAmount.add(new BN(100))}
         ),
         'BUNIROUTER: INVALID_POOL'
       );
 
-      let result = await router.addLiquidityETH(
-        ethPartner.address,
-        ethPool.address,
-        ethPartnerAmount,
-        ethPartnerAmount,
-        ethAmount,
+      let result = await router.addLiquidityBNB(
+        bnbPartner.address,
+        bnbPool.address,
+        bnbPartnerAmount,
+        bnbPartnerAmount,
+        bnbAmount,
         trader,
         bigAmount,
-        {from: trader, value: ethAmount}
+        {from: trader, value: bnbAmount}
       );
-      console.log('addLiquidityETH 1st time: gas used', result.receipt.gasUsed);
-      await expectEvent.inTransaction(result.tx, ethPool, 'Sync', {
-        reserve0: token0 === ethPartner.address ? ethPartnerAmount : ethAmount,
-        reserve1: token0 === ethPartner.address ? ethAmount : ethPartnerAmount
+      console.log('addLiquidityBNB 1st time: gas used', result.receipt.gasUsed);
+      await expectEvent.inTransaction(result.tx, bnbPool, 'Sync', {
+        reserve0: token0 === bnbPartner.address ? bnbPartnerAmount : bnbAmount,
+        reserve1: token0 === bnbPartner.address ? bnbAmount : bnbPartnerAmount
       });
       await expectEvent.inTransaction(result.tx, pool, 'Mint', {
         sender: router.address,
-        amount0: token0 === ethPartner.address ? ethPartnerAmount : ethAmount,
-        amount1: token0 === ethPartner.address ? ethAmount : ethPartnerAmount
+        amount0: token0 === bnbPartner.address ? bnbPartnerAmount : bnbAmount,
+        amount1: token0 === bnbPartner.address ? bnbAmount : bnbPartnerAmount
       });
-      Helper.assertEqual(await ethPool.balanceOf(trader), expectedLiquidity.sub(MINIMUM_LIQUIDITY));
+      Helper.assertEqual(await bnbPool.balanceOf(trader), expectedLiquidity.sub(MINIMUM_LIQUIDITY));
 
-      // test add Liquidity with extra ETH should return to sender
-      result = await router.addLiquidityETH(
-        ethPartner.address,
-        ethPool.address,
-        ethPartnerAmount,
-        ethPartnerAmount,
-        ethAmount,
+      // test add Liquidity with extra BNB should return to sender
+      result = await router.addLiquidityBNB(
+        bnbPartner.address,
+        bnbPool.address,
+        bnbPartnerAmount,
+        bnbPartnerAmount,
+        bnbAmount,
         trader,
         bigAmount,
-        {from: trader, value: ethAmount.add(new BN(100))}
+        {from: trader, value: bnbAmount.add(new BN(100))}
       );
       await expectEvent.inTransaction(result.tx, pool, 'Mint', {
         sender: router.address,
-        amount0: token0 === ethPartner.address ? ethPartnerAmount : ethAmount,
-        amount1: token0 === ethPartner.address ? ethAmount : ethPartnerAmount
+        amount0: token0 === bnbPartner.address ? bnbPartnerAmount : bnbAmount,
+        amount1: token0 === bnbPartner.address ? bnbAmount : bnbPartnerAmount
       });
-      Helper.assertEqual(await ethPool.balanceOf(trader), expectedLiquidity.mul(new BN(2)).sub(MINIMUM_LIQUIDITY));
+      Helper.assertEqual(await bnbPool.balanceOf(trader), expectedLiquidity.mul(new BN(2)).sub(MINIMUM_LIQUIDITY));
 
       // test add Liquidity with extra token
-      result = await router.addLiquidityETH(
-        ethPartner.address,
-        ethPool.address,
-        ethPartnerAmount.add(new BN(500)),
-        ethPartnerAmount,
-        ethAmount,
+      result = await router.addLiquidityBNB(
+        bnbPartner.address,
+        bnbPool.address,
+        bnbPartnerAmount.add(new BN(500)),
+        bnbPartnerAmount,
+        bnbAmount,
         trader,
         bigAmount,
-        {from: trader, value: ethAmount}
+        {from: trader, value: bnbAmount}
       );
-      console.log('addLiquidityETH 2nd time: gas used', result.receipt.gasUsed);
+      console.log('addLiquidityBNB 2nd time: gas used', result.receipt.gasUsed);
       await expectEvent.inTransaction(result.tx, pool, 'Mint', {
         sender: router.address,
-        amount0: token0 === ethPartner.address ? ethPartnerAmount : ethAmount,
-        amount1: token0 === ethPartner.address ? ethAmount : ethPartnerAmount
+        amount0: token0 === bnbPartner.address ? bnbPartnerAmount : bnbAmount,
+        amount1: token0 === bnbPartner.address ? bnbAmount : bnbPartnerAmount
       });
-      Helper.assertEqual(await ethPool.balanceOf(trader), expectedLiquidity.mul(new BN(3)).sub(MINIMUM_LIQUIDITY));
+      Helper.assertEqual(await bnbPool.balanceOf(trader), expectedLiquidity.mul(new BN(3)).sub(MINIMUM_LIQUIDITY));
     });
   });
 
@@ -510,7 +510,7 @@ contract('BuniCornRouter', function (accounts) {
       router.removeLiquidity(
         token0.address,
         token1.address,
-        ethPool.address,
+        bnbPool.address,
         expectedLiquidity.sub(MINIMUM_LIQUIDITY),
         token0Amount.sub(new BN(499)),
         0,
@@ -549,22 +549,22 @@ contract('BuniCornRouter', function (accounts) {
     Helper.assertEqual(await token1.balanceOf(trader), initTokenAmount.sub(new BN(2000)));
   });
 
-  it('removeLiquidityETH', async () => {
-    const ethPartnerAmount = Helper.expandTo18Decimals(1);
-    const ethAmount = Helper.expandTo18Decimals(4);
+  it('removeLiquidityBNB', async () => {
+    const bnbPartnerAmount = Helper.expandTo18Decimals(1);
+    const bnbAmount = Helper.expandTo18Decimals(4);
 
-    await ethPartner.transfer(ethPool.address, ethPartnerAmount, {from: trader});
-    await weth.deposit({value: ethAmount});
-    await weth.transfer(ethPool.address, ethAmount);
-    await ethPool.mint(trader);
+    await bnbPartner.transfer(bnbPool.address, bnbPartnerAmount, {from: trader});
+    await wbnb.deposit({value: bnbAmount});
+    await wbnb.transfer(bnbPool.address, bnbAmount);
+    await bnbPool.mint(trader);
 
     const expectedLiquidity = Helper.expandTo18Decimals(2);
-    const token0 = await ethPool.token0();
-    await ethPool.approve(router.address, bigAmount, {from: trader});
-    let initEthAmount = await Helper.getBalancePromise(trader);
-    let result = await router.removeLiquidityETH(
-      ethPartner.address,
-      ethPool.address,
+    const token0 = await bnbPool.token0();
+    await bnbPool.approve(router.address, bigAmount, {from: trader});
+    let initBnbAmount = await Helper.getBalancePromise(trader);
+    let result = await router.removeLiquidityBNB(
+      bnbPartner.address,
+      bnbPool.address,
       expectedLiquidity.sub(MINIMUM_LIQUIDITY),
       0,
       0,
@@ -573,20 +573,20 @@ contract('BuniCornRouter', function (accounts) {
       {from: trader, gasPrice: new BN(0)}
     );
     console.log('gas used', result.receipt.gasUsed);
-    await expectEvent.inTransaction(result.tx, ethPool, 'Sync', {
-      reserve0: token0 === ethPartner.address ? new BN(500) : new BN(2000),
-      reserve1: token0 === ethPartner.address ? new BN(2000) : new BN(500)
+    await expectEvent.inTransaction(result.tx, bnbPool, 'Sync', {
+      reserve0: token0 === bnbPartner.address ? new BN(500) : new BN(2000),
+      reserve1: token0 === bnbPartner.address ? new BN(2000) : new BN(500)
     });
 
-    await expectEvent.inTransaction(result.tx, ethPool, 'Burn', {
+    await expectEvent.inTransaction(result.tx, bnbPool, 'Burn', {
       sender: router.address,
-      amount0: token0 === ethPartner.address ? ethPartnerAmount.sub(new BN(500)) : ethAmount.sub(new BN(2000)),
-      amount1: token0 === ethPartner.address ? ethAmount.sub(new BN(2000)) : ethPartnerAmount.sub(new BN(500)),
+      amount0: token0 === bnbPartner.address ? bnbPartnerAmount.sub(new BN(500)) : bnbAmount.sub(new BN(2000)),
+      amount1: token0 === bnbPartner.address ? bnbAmount.sub(new BN(2000)) : bnbPartnerAmount.sub(new BN(500)),
       to: router.address
     });
-    Helper.assertEqual(await ethPool.balanceOf(trader), new BN(0));
-    Helper.assertEqual(await ethPartner.balanceOf(trader), initTokenAmount.sub(new BN(500)));
-    Helper.assertEqual(await Helper.getBalancePromise(trader), initEthAmount.add(ethAmount).sub(new BN(2000)));
+    Helper.assertEqual(await bnbPool.balanceOf(trader), new BN(0));
+    Helper.assertEqual(await bnbPartner.balanceOf(trader), initTokenAmount.sub(new BN(500)));
+    Helper.assertEqual(await Helper.getBalancePromise(trader), initBnbAmount.add(bnbAmount).sub(new BN(2000)));
   });
 
   it('removeLiquidityWithPermit', async () => {
@@ -671,19 +671,19 @@ contract('BuniCornRouter', function (accounts) {
     );
   });
 
-  it('removeLiquidityETHWithPermit', async () => {
-    const ethPartnerAmount = Helper.expandTo18Decimals(1);
-    const ethAmount = Helper.expandTo18Decimals(4);
-    await ethPartner.transfer(ethPool.address, ethPartnerAmount, {from: trader});
-    await weth.deposit({value: ethAmount});
-    await weth.transfer(ethPool.address, ethAmount);
-    await ethPool.mint(liquidityProvider);
+  it('removeLiquidityBNBWithPermit', async () => {
+    const bnbPartnerAmount = Helper.expandTo18Decimals(1);
+    const bnbAmount = Helper.expandTo18Decimals(4);
+    await bnbPartner.transfer(bnbPool.address, bnbPartnerAmount, {from: trader});
+    await wbnb.deposit({value: bnbAmount});
+    await wbnb.transfer(bnbPool.address, bnbAmount);
+    await bnbPool.mint(liquidityProvider);
     const expectedLiquidity = Helper.expandTo18Decimals(2);
-    const token0 = await ethPool.token0();
+    const token0 = await bnbPool.token0();
 
-    const nonce = await ethPool.nonces(trader);
+    const nonce = await bnbPool.nonces(trader);
     const digest = await Helper.getApprovalDigest(
-      ethPool,
+      bnbPool,
       liquidityProvider,
       router.address,
       expectedLiquidity.sub(MINIMUM_LIQUIDITY),
@@ -692,11 +692,11 @@ contract('BuniCornRouter', function (accounts) {
     );
     const {v, r, s} = ecsign(Buffer.from(digest.slice(2), 'hex'), Buffer.from(liquidityProviderPkKey.slice(2), 'hex'));
 
-    const beforeTokenBalance = await ethPartner.balanceOf(liquidityProvider);
-    const beforeEthBalance = await Helper.getBalancePromise(liquidityProvider);
-    let result = await router.removeLiquidityETHWithPermit(
-      ethPartner.address,
-      ethPool.address,
+    const beforeTokenBalance = await bnbPartner.balanceOf(liquidityProvider);
+    const beforeBnbBalance = await Helper.getBalancePromise(liquidityProvider);
+    let result = await router.removeLiquidityBNBWithPermit(
+      bnbPartner.address,
+      bnbPool.address,
       expectedLiquidity.sub(MINIMUM_LIQUIDITY),
       0,
       0,
@@ -709,32 +709,32 @@ contract('BuniCornRouter', function (accounts) {
       {from: liquidityProvider, gasPrice: new BN(0)} // because we calculate the balance after trade so gas price should be 0
     );
     console.log('gas used', result.receipt.gasUsed);
-    await expectEvent.inTransaction(result.tx, ethPool, 'Sync', {
-      reserve0: token0 === ethPartner.address ? new BN(500) : new BN(2000),
-      reserve1: token0 === ethPartner.address ? new BN(2000) : new BN(500)
+    await expectEvent.inTransaction(result.tx, bnbPool, 'Sync', {
+      reserve0: token0 === bnbPartner.address ? new BN(500) : new BN(2000),
+      reserve1: token0 === bnbPartner.address ? new BN(2000) : new BN(500)
     });
-    await expectEvent.inTransaction(result.tx, ethPool, 'Burn', {
+    await expectEvent.inTransaction(result.tx, bnbPool, 'Burn', {
       sender: router.address,
-      amount0: token0 === ethPartner.address ? ethPartnerAmount.sub(new BN(500)) : ethAmount.sub(new BN(2000)),
-      amount1: token0 === ethPartner.address ? ethAmount.sub(new BN(2000)) : ethPartnerAmount.sub(new BN(500)),
+      amount0: token0 === bnbPartner.address ? bnbPartnerAmount.sub(new BN(500)) : bnbAmount.sub(new BN(2000)),
+      amount1: token0 === bnbPartner.address ? bnbAmount.sub(new BN(2000)) : bnbPartnerAmount.sub(new BN(500)),
       to: router.address
     });
 
     Helper.assertEqual(await pool.balanceOf(liquidityProvider), new BN(0));
     Helper.assertEqual(
-      await ethPartner.balanceOf(liquidityProvider),
-      beforeTokenBalance.add(ethPartnerAmount).sub(new BN(500))
+      await bnbPartner.balanceOf(liquidityProvider),
+      beforeTokenBalance.add(bnbPartnerAmount).sub(new BN(500))
     );
     Helper.assertEqual(
       await Helper.getBalancePromise(liquidityProvider),
-      beforeEthBalance.add(ethAmount).sub(new BN(2000))
+      beforeBnbBalance.add(bnbAmount).sub(new BN(2000))
     );
   });
 
   describe('test query rate function', async () => {
     it('getAmountOut', async () => {
       let [factory, pool] = await setupPool(feeToSetter, token0, token1, new BN(20000));
-      let router = await BuniCornRouter.new(factory.address, weth.address);
+      let router = await BuniCornRouter.new(factory.address, wbnb.address);
       const token0Amount = Helper.expandTo18Decimals(5);
       const token1Amount = Helper.expandTo18Decimals(10);
       const swapAmount = Helper.expandTo18Decimals(1);
@@ -743,7 +743,7 @@ contract('BuniCornRouter', function (accounts) {
       // revert if invalid path.length
       await expectRevert(router.getAmountsOut(swapAmount, poolsPath, [token0.address]), 'BUNIROUTER: INVALID_PATH');
       await expectRevert(
-        router.getAmountsOut(swapAmount, poolsPath, [token0.address, token1.address, weth.address]),
+        router.getAmountsOut(swapAmount, poolsPath, [token0.address, token1.address, wbnb.address]),
         'BUNIROUTER: INVALID_POOLS_PATH'
       );
 
@@ -782,7 +782,7 @@ contract('BuniCornRouter', function (accounts) {
 
     it('getAmountIn', async () => {
       [factory, pool] = await setupPool(feeToSetter, token0, token1, new BN(20000));
-      let router = await BuniCornRouter.new(factory.address, weth.address);
+      let router = await BuniCornRouter.new(factory.address, wbnb.address);
       const token0Amount = Helper.expandTo18Decimals(5);
       const token1Amount = Helper.expandTo18Decimals(10);
       const swapAmount = Helper.expandTo18Decimals(1);
@@ -820,30 +820,30 @@ contract('BuniCornRouter', function (accounts) {
     });
   });
 
-  it('swapETHForExactTokens', async () => {
-    let ethPartnerAmount = Helper.expandTo18Decimals(10);
-    let ethAmount = Helper.expandTo18Decimals(5);
+  it('swapBNBForExactTokens', async () => {
+    let bnbPartnerAmount = Helper.expandTo18Decimals(10);
+    let bnbAmount = Helper.expandTo18Decimals(5);
     const outputAmount = Helper.expandTo18Decimals(1);
     const swapAmount = new BN('565227237267357629');
     // init pool
-    await ethPartner.transfer(ethPool.address, ethPartnerAmount);
-    await weth.deposit({value: ethAmount});
-    await weth.transfer(ethPool.address, ethAmount);
-    await ethPool.mint(trader);
+    await bnbPartner.transfer(bnbPool.address, bnbPartnerAmount);
+    await wbnb.deposit({value: bnbAmount});
+    await wbnb.transfer(bnbPool.address, bnbAmount);
+    await bnbPool.mint(trader);
 
-    const ethPoolToken0 = await ethPool.token0();
-    const poolsPath = [ethPool.address];
-    const path = [weth.address, ethPartner.address];
+    const bnbPoolToken0 = await bnbPool.token0();
+    const poolsPath = [bnbPool.address];
+    const path = [wbnb.address, bnbPartner.address];
     let expectAmountIn = (await router.getAmountsIn(outputAmount, poolsPath, path))[0];
     // update amount
-    ethAmount = ethAmount.add(expectAmountIn);
-    ethPartnerAmount = ethPartnerAmount.sub(outputAmount);
+    bnbAmount = bnbAmount.add(expectAmountIn);
+    bnbPartnerAmount = bnbPartnerAmount.sub(outputAmount);
 
-    let tokenBalance = await ethPartner.balanceOf(trader);
-    let ethBalance = await Helper.getBalancePromise(trader);
+    let tokenBalance = await bnbPartner.balanceOf(trader);
+    let bnbBalance = await Helper.getBalancePromise(trader);
     // revert if invalid path
     await expectRevert(
-      router.swapETHForExactTokens(outputAmount, poolsPath, [token0.address, ethPartner.address], trader, bigAmount, {
+      router.swapBNBForExactTokens(outputAmount, poolsPath, [token0.address, bnbPartner.address], trader, bigAmount, {
         from: trader,
         value: swapAmount,
         gasPrice: new BN(0)
@@ -852,7 +852,7 @@ contract('BuniCornRouter', function (accounts) {
     );
     // revert if excessive input amount
     await expectRevert(
-      router.swapETHForExactTokens(outputAmount, poolsPath, path, trader, bigAmount, {
+      router.swapBNBForExactTokens(outputAmount, poolsPath, path, trader, bigAmount, {
         from: trader,
         value: expectAmountIn.sub(new BN(1)),
         gasPrice: new BN(0)
@@ -860,35 +860,35 @@ contract('BuniCornRouter', function (accounts) {
       'BUNIROUTER: EXCESSIVE_INPUT_AMOUNT'
     );
 
-    result = await router.swapETHForExactTokens(outputAmount, poolsPath, path, trader, bigAmount, {
+    result = await router.swapBNBForExactTokens(outputAmount, poolsPath, path, trader, bigAmount, {
       from: trader,
       value: swapAmount,
       gasPrice: new BN(0)
     });
     console.log('gas used', result.receipt.gasUsed);
 
-    await expectEvent.inTransaction(result.tx, ethPool, 'Swap', {
+    await expectEvent.inTransaction(result.tx, bnbPool, 'Swap', {
       sender: router.address,
-      amount0In: ethPoolToken0 === ethPartner.address ? new BN(0) : expectAmountIn,
-      amount1In: ethPoolToken0 === ethPartner.address ? expectAmountIn : new BN(0),
-      amount0Out: ethPoolToken0 === ethPartner.address ? outputAmount : new BN(0),
-      amount1Out: ethPoolToken0 === ethPartner.address ? new BN(0) : outputAmount,
+      amount0In: bnbPoolToken0 === bnbPartner.address ? new BN(0) : expectAmountIn,
+      amount1In: bnbPoolToken0 === bnbPartner.address ? expectAmountIn : new BN(0),
+      amount0Out: bnbPoolToken0 === bnbPartner.address ? outputAmount : new BN(0),
+      amount1Out: bnbPoolToken0 === bnbPartner.address ? new BN(0) : outputAmount,
       to: trader
     });
 
-    await expectEvent.inTransaction(result.tx, ethPool, 'Sync', {
-      reserve0: ethPoolToken0 === ethPartner.address ? ethPartnerAmount : ethAmount,
-      reserve1: ethPoolToken0 === ethPartner.address ? ethAmount : ethPartnerAmount
+    await expectEvent.inTransaction(result.tx, bnbPool, 'Sync', {
+      reserve0: bnbPoolToken0 === bnbPartner.address ? bnbPartnerAmount : bnbAmount,
+      reserve1: bnbPoolToken0 === bnbPartner.address ? bnbAmount : bnbPartnerAmount
     });
 
-    Helper.assertEqual(await ethPartner.balanceOf(trader), tokenBalance.add(outputAmount));
-    Helper.assertEqual(await Helper.getBalancePromise(trader), ethBalance.sub(expectAmountIn));
+    Helper.assertEqual(await bnbPartner.balanceOf(trader), tokenBalance.add(outputAmount));
+    Helper.assertEqual(await Helper.getBalancePromise(trader), bnbBalance.sub(expectAmountIn));
 
-    // edge case not refund dust eth if msg.value = amounts[0]
+    // edge case not refund dust bnb if msg.value = amounts[0]
     await time.advanceBlock();
     expectAmountIn = (await router.getAmountsIn(outputAmount, poolsPath, path))[0];
 
-    result = await router.swapETHForExactTokens(outputAmount, poolsPath, path, trader, bigAmount, {
+    result = await router.swapBNBForExactTokens(outputAmount, poolsPath, path, trader, bigAmount, {
       from: trader,
       value: expectAmountIn,
       gasPrice: new BN(0)
@@ -896,90 +896,90 @@ contract('BuniCornRouter', function (accounts) {
     console.log('gas used', result.receipt.gasUsed);
   });
 
-  it('swapExactTokensForETH', async () => {
-    let ethPartnerAmount = Helper.expandTo18Decimals(5);
-    let ethAmount = Helper.expandTo18Decimals(10);
+  it('swapExactTokensForBNB', async () => {
+    let bnbPartnerAmount = Helper.expandTo18Decimals(5);
+    let bnbAmount = Helper.expandTo18Decimals(10);
     const swapAmount = Helper.expandTo18Decimals(1);
 
-    await ethPartner.transfer(ethPool.address, ethPartnerAmount);
-    await weth.deposit({value: ethAmount});
-    await weth.transfer(ethPool.address, ethAmount);
-    await ethPool.mint(trader);
+    await bnbPartner.transfer(bnbPool.address, bnbPartnerAmount);
+    await wbnb.deposit({value: bnbAmount});
+    await wbnb.transfer(bnbPool.address, bnbAmount);
+    await bnbPool.mint(trader);
 
-    const ethPoolToken0 = await ethPool.token0();
+    const bnbPoolToken0 = await bnbPool.token0();
 
-    const path = [ethPartner.address, weth.address];
-    const poolsPath = [ethPool.address];
+    const path = [bnbPartner.address, wbnb.address];
+    const poolsPath = [bnbPool.address];
     let amounts = await router.getAmountsOut(swapAmount, poolsPath, path);
     let expectAmountOut = amounts[amounts.length - 1];
 
-    await ethPartner.approve(router.address, bigAmount, {from: trader});
-    let ethBalance = await Helper.getBalancePromise(trader);
-    let tokenBalance = await ethPartner.balanceOf(trader);
+    await bnbPartner.approve(router.address, bigAmount, {from: trader});
+    let bnbBalance = await Helper.getBalancePromise(trader);
+    let tokenBalance = await bnbPartner.balanceOf(trader);
 
     await expectRevert(
-      router.swapExactTokensForETH(swapAmount, 0, poolsPath, [ethPartner.address, token0.address], trader, bigAmount, {
+      router.swapExactTokensForBNB(swapAmount, 0, poolsPath, [bnbPartner.address, token0.address], trader, bigAmount, {
         from: trader,
         gasPrice: new BN(0)
       }),
       'BUNIROUTER: INVALID_PATH'
     );
     await expectRevert(
-      router.swapExactTokensForETH(swapAmount, expectAmountOut.add(BNOne), poolsPath, path, trader, bigAmount, {
+      router.swapExactTokensForBNB(swapAmount, expectAmountOut.add(BNOne), poolsPath, path, trader, bigAmount, {
         from: trader,
         gasPrice: new BN(0)
       }),
       'BUNIROUTER: INSUFFICIENT_OUTPUT_AMOUNT'
     );
-    let result = await router.swapExactTokensForETH(swapAmount, 0, poolsPath, path, trader, bigAmount, {
+    let result = await router.swapExactTokensForBNB(swapAmount, 0, poolsPath, path, trader, bigAmount, {
       from: trader,
       gasPrice: new BN(0)
     });
     console.log('gas used', result.receipt.gasUsed);
 
-    ethPartnerAmount = ethPartnerAmount.add(swapAmount);
-    ethAmount = ethAmount.sub(expectAmountOut);
-    await expectEvent.inTransaction(result.tx, ethPool, 'Sync', {
-      reserve0: ethPoolToken0 === ethPartner.address ? ethPartnerAmount : ethAmount,
-      reserve1: ethPoolToken0 === ethPartner.address ? ethAmount : ethPartnerAmount
+    bnbPartnerAmount = bnbPartnerAmount.add(swapAmount);
+    bnbAmount = bnbAmount.sub(expectAmountOut);
+    await expectEvent.inTransaction(result.tx, bnbPool, 'Sync', {
+      reserve0: bnbPoolToken0 === bnbPartner.address ? bnbPartnerAmount : bnbAmount,
+      reserve1: bnbPoolToken0 === bnbPartner.address ? bnbAmount : bnbPartnerAmount
     });
-    await expectEvent.inTransaction(result.tx, ethPool, 'Swap', {
+    await expectEvent.inTransaction(result.tx, bnbPool, 'Swap', {
       sender: router.address,
-      amount0In: ethPoolToken0 === ethPartner.address ? swapAmount : new BN(0),
-      amount1In: ethPoolToken0 === ethPartner.address ? new BN(0) : swapAmount,
-      amount0Out: ethPoolToken0 === ethPartner.address ? new BN(0) : expectAmountOut,
-      amount1Out: ethPoolToken0 === ethPartner.address ? expectAmountOut : new BN(0),
+      amount0In: bnbPoolToken0 === bnbPartner.address ? swapAmount : new BN(0),
+      amount1In: bnbPoolToken0 === bnbPartner.address ? new BN(0) : swapAmount,
+      amount0Out: bnbPoolToken0 === bnbPartner.address ? new BN(0) : expectAmountOut,
+      amount1Out: bnbPoolToken0 === bnbPartner.address ? expectAmountOut : new BN(0),
       to: router.address
     });
 
-    Helper.assertEqual(await ethPartner.balanceOf(trader), tokenBalance.sub(swapAmount));
-    Helper.assertEqual(await Helper.getBalancePromise(trader), ethBalance.add(expectAmountOut));
+    Helper.assertEqual(await bnbPartner.balanceOf(trader), tokenBalance.sub(swapAmount));
+    Helper.assertEqual(await Helper.getBalancePromise(trader), bnbBalance.add(expectAmountOut));
   });
 
-  it('swapTokensForExactETH', async () => {
-    let ethPartnerAmount = Helper.expandTo18Decimals(5);
-    let ethAmount = Helper.expandTo18Decimals(10);
+  it('swapTokensForExactBNB', async () => {
+    let bnbPartnerAmount = Helper.expandTo18Decimals(5);
+    let bnbAmount = Helper.expandTo18Decimals(10);
     const outputAmount = Helper.expandTo18Decimals(1);
-    const poolsPath = [ethPool.address];
-    const path = [ethPartner.address, weth.address];
+    const poolsPath = [bnbPool.address];
+    const path = [bnbPartner.address, wbnb.address];
 
-    await ethPartner.transfer(ethPool.address, ethPartnerAmount);
-    await weth.deposit({value: ethAmount});
-    await weth.transfer(ethPool.address, ethAmount);
-    await ethPool.mint(trader, {from: trader});
+    await bnbPartner.transfer(bnbPool.address, bnbPartnerAmount);
+    await wbnb.deposit({value: bnbAmount});
+    await wbnb.transfer(bnbPool.address, bnbAmount);
+    await bnbPool.mint(trader, {from: trader});
 
-    await ethPartner.approve(router.address, bigAmount, {from: trader});
-    const ethPoolToken0 = await ethPool.token0();
+    await bnbPartner.approve(router.address, bigAmount, {from: trader});
+    const bnbPoolToken0 = await bnbPool.token0();
 
     let amounts = await router.getAmountsIn(outputAmount, poolsPath, path);
     let expectAmountIn = amounts[0];
 
-    let ethBalance = await Helper.getBalancePromise(trader);
-    let tokenBalance = await ethPartner.balanceOf(trader);
+    let bnbBalance = await Helper.getBalancePromise(trader);
+    let tokenBalance = await bnbPartner.balanceOf(trader);
 
-    const invalidPath = [ethPartner.address, token0.address];
+    const invalidPath = [bnbPartner.address, token0.address];
     await expectRevert(
-      router.swapTokensForExactETH(outputAmount, bigAmount, poolsPath, invalidPath, trader, bigAmount, {
+      router.swapTokensForExactBNB(outputAmount, bigAmount, poolsPath, invalidPath, trader, bigAmount, {
         from: trader,
         gasPrice: new BN(0)
       }),
@@ -987,62 +987,62 @@ contract('BuniCornRouter', function (accounts) {
     );
 
     await expectRevert(
-      router.swapTokensForExactETH(outputAmount, expectAmountIn.sub(BNOne), poolsPath, path, trader, bigAmount, {
+      router.swapTokensForExactBNB(outputAmount, expectAmountIn.sub(BNOne), poolsPath, path, trader, bigAmount, {
         from: trader,
         gasPrice: new BN(0)
       }),
       'BUNIROUTER: EXCESSIVE_INPUT_AMOUNT'
     );
-    let result = await router.swapTokensForExactETH(outputAmount, bigAmount, poolsPath, path, trader, bigAmount, {
+    let result = await router.swapTokensForExactBNB(outputAmount, bigAmount, poolsPath, path, trader, bigAmount, {
       from: trader,
       gasPrice: new BN(0)
     });
     console.log('gas used', result.receipt.gasUsed);
 
-    ethAmount = ethAmount.sub(outputAmount);
-    ethPartnerAmount = ethPartnerAmount.add(expectAmountIn);
-    await expectEvent.inTransaction(result.tx, ethPool, 'Sync', {
-      reserve0: ethPoolToken0 === ethPartner.address ? ethPartnerAmount : ethAmount,
-      reserve1: ethPoolToken0 === ethPartner.address ? ethAmount : ethPartnerAmount
+    bnbAmount = bnbAmount.sub(outputAmount);
+    bnbPartnerAmount = bnbPartnerAmount.add(expectAmountIn);
+    await expectEvent.inTransaction(result.tx, bnbPool, 'Sync', {
+      reserve0: bnbPoolToken0 === bnbPartner.address ? bnbPartnerAmount : bnbAmount,
+      reserve1: bnbPoolToken0 === bnbPartner.address ? bnbAmount : bnbPartnerAmount
     });
-    await expectEvent.inTransaction(result.tx, ethPool, 'Swap', {
+    await expectEvent.inTransaction(result.tx, bnbPool, 'Swap', {
       sender: router.address,
-      amount0In: ethPoolToken0 === ethPartner.address ? expectAmountIn : new BN(0),
-      amount1In: ethPoolToken0 === ethPartner.address ? new BN(0) : expectAmountIn,
-      amount0Out: ethPoolToken0 === ethPartner.address ? new BN(0) : outputAmount,
-      amount1Out: ethPoolToken0 === ethPartner.address ? outputAmount : new BN(0),
+      amount0In: bnbPoolToken0 === bnbPartner.address ? expectAmountIn : new BN(0),
+      amount1In: bnbPoolToken0 === bnbPartner.address ? new BN(0) : expectAmountIn,
+      amount0Out: bnbPoolToken0 === bnbPartner.address ? new BN(0) : outputAmount,
+      amount1Out: bnbPoolToken0 === bnbPartner.address ? outputAmount : new BN(0),
       to: router.address
     });
 
-    Helper.assertEqual(await ethPartner.balanceOf(trader), tokenBalance.sub(expectAmountIn));
-    Helper.assertEqual(await Helper.getBalancePromise(trader), ethBalance.add(outputAmount));
+    Helper.assertEqual(await bnbPartner.balanceOf(trader), tokenBalance.sub(expectAmountIn));
+    Helper.assertEqual(await Helper.getBalancePromise(trader), bnbBalance.add(outputAmount));
   });
 
-  it('swapExactETHForTokens', async () => {
-    let ethPartnerAmount = Helper.expandTo18Decimals(10);
-    let ethAmount = Helper.expandTo18Decimals(5);
+  it('swapExactBNBForTokens', async () => {
+    let bnbPartnerAmount = Helper.expandTo18Decimals(10);
+    let bnbAmount = Helper.expandTo18Decimals(5);
     const swapAmount = Helper.expandTo18Decimals(1);
-    const poolsPath = [ethPool.address];
-    const path = [weth.address, ethPartner.address];
+    const poolsPath = [bnbPool.address];
+    const path = [wbnb.address, bnbPartner.address];
 
-    await ethPartner.transfer(ethPool.address, ethPartnerAmount);
-    await weth.deposit({value: ethAmount});
-    await weth.transfer(ethPool.address, ethAmount);
-    await ethPool.mint(trader);
+    await bnbPartner.transfer(bnbPool.address, bnbPartnerAmount);
+    await wbnb.deposit({value: bnbAmount});
+    await wbnb.transfer(bnbPool.address, bnbAmount);
+    await bnbPool.mint(trader);
 
     await token0.approve(router.address, bigAmount, {from: trader});
 
-    const ethPoolToken0 = await ethPool.token0();
+    const bnbPoolToken0 = await bnbPool.token0();
 
     let amounts = await router.getAmountsOut(swapAmount, poolsPath, path);
     let expectedOutputAmount = amounts[amounts.length - 1];
 
-    let ethBalance = await Helper.getBalancePromise(trader);
-    let tokenBalance = await ethPartner.balanceOf(trader);
+    let bnbBalance = await Helper.getBalancePromise(trader);
+    let tokenBalance = await bnbPartner.balanceOf(trader);
 
-    const invalidPath = [token0.address, ethPartner.address];
+    const invalidPath = [token0.address, bnbPartner.address];
     await expectRevert(
-      router.swapExactETHForTokens(0, poolsPath, invalidPath, trader, bigAmount, {
+      router.swapExactBNBForTokens(0, poolsPath, invalidPath, trader, bigAmount, {
         from: trader,
         value: swapAmount,
         gasPrice: 0
@@ -1050,37 +1050,37 @@ contract('BuniCornRouter', function (accounts) {
       'BUNIROUTER: INVALID_PATH'
     );
     await expectRevert(
-      router.swapExactETHForTokens(expectedOutputAmount.add(BNOne), poolsPath, path, trader, bigAmount, {
+      router.swapExactBNBForTokens(expectedOutputAmount.add(BNOne), poolsPath, path, trader, bigAmount, {
         from: trader,
         value: swapAmount,
         gasPrice: 0
       }),
       'BUNIROUTER: INSUFFICIENT_OUTPUT_AMOUNT'
     );
-    let result = await router.swapExactETHForTokens(0, poolsPath, path, trader, bigAmount, {
+    let result = await router.swapExactBNBForTokens(0, poolsPath, path, trader, bigAmount, {
       from: trader,
       value: swapAmount,
       gasPrice: 0
     });
     console.log('gas used', result.receipt.gasUsed);
 
-    ethPartnerAmount = ethPartnerAmount.sub(expectedOutputAmount);
-    ethAmount = ethAmount.add(swapAmount);
-    await expectEvent.inTransaction(result.tx, ethPool, 'Sync', {
-      reserve0: ethPoolToken0 === ethPartner.address ? ethPartnerAmount : ethAmount,
-      reserve1: ethPoolToken0 === ethPartner.address ? ethAmount : ethPartnerAmount
+    bnbPartnerAmount = bnbPartnerAmount.sub(expectedOutputAmount);
+    bnbAmount = bnbAmount.add(swapAmount);
+    await expectEvent.inTransaction(result.tx, bnbPool, 'Sync', {
+      reserve0: bnbPoolToken0 === bnbPartner.address ? bnbPartnerAmount : bnbAmount,
+      reserve1: bnbPoolToken0 === bnbPartner.address ? bnbAmount : bnbPartnerAmount
     });
-    await expectEvent.inTransaction(result.tx, ethPool, 'Swap', {
+    await expectEvent.inTransaction(result.tx, bnbPool, 'Swap', {
       sender: router.address,
-      amount0In: ethPoolToken0 === ethPartner.address ? new BN(0) : swapAmount,
-      amount1In: ethPoolToken0 === ethPartner.address ? swapAmount : new BN(0),
-      amount0Out: ethPoolToken0 === ethPartner.address ? expectedOutputAmount : new BN(0),
-      amount1Out: ethPoolToken0 === ethPartner.address ? new BN(0) : expectedOutputAmount,
+      amount0In: bnbPoolToken0 === bnbPartner.address ? new BN(0) : swapAmount,
+      amount1In: bnbPoolToken0 === bnbPartner.address ? swapAmount : new BN(0),
+      amount0Out: bnbPoolToken0 === bnbPartner.address ? expectedOutputAmount : new BN(0),
+      amount1Out: bnbPoolToken0 === bnbPartner.address ? new BN(0) : expectedOutputAmount,
       to: trader
     });
 
-    Helper.assertEqual(await ethPartner.balanceOf(trader), tokenBalance.add(expectedOutputAmount));
-    Helper.assertEqual(await Helper.getBalancePromise(trader), ethBalance.sub(swapAmount));
+    Helper.assertEqual(await bnbPartner.balanceOf(trader), tokenBalance.add(expectedOutputAmount));
+    Helper.assertEqual(await Helper.getBalancePromise(trader), bnbBalance.sub(swapAmount));
   });
 
   it('swapExactTokensForTokens', async () => {
@@ -1272,13 +1272,13 @@ contract('BuniCornRouter', function (accounts) {
       Helper.assertEqual(await token0.balanceOf(trader), balanceBefore.sub(amounts[0]));
     });
 
-    it('swapExactTokensForETH', async () => {
-      await factory.createPool(token1.address, weth.address, new BN(20000));
-      const poolAddrs = await factory.getPools(token1.address, weth.address);
+    it('swapExactTokensForBNB', async () => {
+      await factory.createPool(token1.address, wbnb.address, new BN(20000));
+      const poolAddrs = await factory.getPools(token1.address, wbnb.address);
       let pool2 = await BuniCornPool.at(poolAddrs[0]);
       await token1.transfer(pool2.address, Helper.expandTo18Decimals(15));
-      await weth.deposit({value: Helper.expandTo18Decimals(14)});
-      await weth.transfer(pool2.address, Helper.expandTo18Decimals(14));
+      await wbnb.deposit({value: Helper.expandTo18Decimals(14)});
+      await wbnb.transfer(pool2.address, Helper.expandTo18Decimals(14));
       await pool2.mint(liquidityProvider);
 
       await token0.transfer(pool.address, Helper.expandTo18Decimals(5));
@@ -1286,13 +1286,13 @@ contract('BuniCornRouter', function (accounts) {
       await pool.mint(liquidityProvider);
 
       let poolsPath = [pool.address, pool2.address];
-      let path = [token0.address, token1.address, weth.address];
+      let path = [token0.address, token1.address, wbnb.address];
       let swapAmount = Helper.expandTo18Decimals(1);
       let amounts = await router.getAmountsOut(swapAmount, poolsPath, path);
 
       await token0.approve(router.address, swapAmount, {from: trader});
       let balanceBefore = await Helper.getBalancePromise(trader);
-      await router.swapExactTokensForETH(
+      await router.swapExactTokensForBNB(
         swapAmount,
         amounts[amounts.length - 1],
         poolsPath,
@@ -1307,13 +1307,13 @@ contract('BuniCornRouter', function (accounts) {
       Helper.assertEqual(await Helper.getBalancePromise(trader), amounts[amounts.length - 1].add(balanceBefore));
     });
 
-    it('swapExactETHForTokens', async () => {
-      await factory.createPool(token1.address, weth.address, new BN(20000));
-      const poolAddrs = await factory.getPools(token1.address, weth.address);
+    it('swapExactBNBForTokens', async () => {
+      await factory.createPool(token1.address, wbnb.address, new BN(20000));
+      const poolAddrs = await factory.getPools(token1.address, wbnb.address);
       let pool2 = await BuniCornPool.at(poolAddrs[0]);
       await token1.transfer(pool2.address, Helper.expandTo18Decimals(12));
-      await weth.deposit({value: Helper.expandTo18Decimals(14)});
-      await weth.transfer(pool2.address, Helper.expandTo18Decimals(14));
+      await wbnb.deposit({value: Helper.expandTo18Decimals(14)});
+      await wbnb.transfer(pool2.address, Helper.expandTo18Decimals(14));
       await pool2.mint(liquidityProvider);
 
       await token0.transfer(pool.address, Helper.expandTo18Decimals(5));
@@ -1321,25 +1321,25 @@ contract('BuniCornRouter', function (accounts) {
       await pool.mint(liquidityProvider);
 
       let poolsPath = [pool2.address, pool.address];
-      let path = [weth.address, token1.address, token0.address];
+      let path = [wbnb.address, token1.address, token0.address];
       let swapAmount = Helper.expandTo18Decimals(1);
       let amounts = await router.getAmountsOut(swapAmount, poolsPath, path);
 
       let balanceBefore = await token0.balanceOf(trader);
-      await router.swapExactETHForTokens(amounts[amounts.length - 1], poolsPath, path, trader, Helper.MaxUint256, {
+      await router.swapExactBNBForTokens(amounts[amounts.length - 1], poolsPath, path, trader, Helper.MaxUint256, {
         from: trader,
         value: swapAmount
       });
       Helper.assertEqual(await token0.balanceOf(trader), balanceBefore.add(amounts[amounts.length - 1]));
     });
 
-    it('swapTokensForExactETH', async () => {
-      await factory.createPool(token1.address, weth.address, new BN(20000));
-      const poolAddrs = await factory.getPools(token1.address, weth.address);
+    it('swapTokensForExactBNB', async () => {
+      await factory.createPool(token1.address, wbnb.address, new BN(20000));
+      const poolAddrs = await factory.getPools(token1.address, wbnb.address);
       let pool2 = await BuniCornPool.at(poolAddrs[0]);
       await token1.transfer(pool2.address, Helper.expandTo18Decimals(15));
-      await weth.deposit({value: Helper.expandTo18Decimals(14)});
-      await weth.transfer(pool2.address, Helper.expandTo18Decimals(14));
+      await wbnb.deposit({value: Helper.expandTo18Decimals(14)});
+      await wbnb.transfer(pool2.address, Helper.expandTo18Decimals(14));
       await pool2.mint(liquidityProvider);
 
       await token0.transfer(pool.address, Helper.expandTo18Decimals(5));
@@ -1347,25 +1347,25 @@ contract('BuniCornRouter', function (accounts) {
       await pool.mint(liquidityProvider);
 
       let poolsPath = [pool.address, pool2.address];
-      let path = [token0.address, token1.address, weth.address];
+      let path = [token0.address, token1.address, wbnb.address];
       let swapAmount = Helper.expandTo18Decimals(1);
       let amounts = await router.getAmountsIn(swapAmount, poolsPath, path);
 
       await token0.approve(router.address, amounts[0], {from: trader});
       let balanceBefore = await token0.balanceOf(trader);
-      await router.swapTokensForExactETH(swapAmount, amounts[0], poolsPath, path, trader, Helper.MaxUint256, {
+      await router.swapTokensForExactBNB(swapAmount, amounts[0], poolsPath, path, trader, Helper.MaxUint256, {
         from: trader
       });
       Helper.assertEqual(await token0.balanceOf(trader), balanceBefore.sub(amounts[0]));
     });
 
-    it('swapETHForExactTokens', async () => {
-      await factory.createPool(token1.address, weth.address, new BN(20000));
-      const poolAddrs = await factory.getPools(token1.address, weth.address);
+    it('swapBNBForExactTokens', async () => {
+      await factory.createPool(token1.address, wbnb.address, new BN(20000));
+      const poolAddrs = await factory.getPools(token1.address, wbnb.address);
       let pool2 = await BuniCornPool.at(poolAddrs[0]);
       await token1.transfer(pool2.address, Helper.expandTo18Decimals(12));
-      await weth.deposit({value: Helper.expandTo18Decimals(14)});
-      await weth.transfer(pool2.address, Helper.expandTo18Decimals(14));
+      await wbnb.deposit({value: Helper.expandTo18Decimals(14)});
+      await wbnb.transfer(pool2.address, Helper.expandTo18Decimals(14));
       await pool2.mint(liquidityProvider);
 
       await token0.transfer(pool.address, Helper.expandTo18Decimals(5));
@@ -1373,12 +1373,12 @@ contract('BuniCornRouter', function (accounts) {
       await pool.mint(liquidityProvider);
 
       let poolsPath = [pool2.address, pool.address];
-      let path = [weth.address, token1.address, token0.address];
+      let path = [wbnb.address, token1.address, token0.address];
       let swapAmount = Helper.expandTo18Decimals(1);
       let amounts = await router.getAmountsIn(swapAmount, poolsPath, path);
 
       let balanceBefore = await Helper.getBalancePromise(trader);
-      await router.swapETHForExactTokens(swapAmount, poolsPath, path, trader, Helper.MaxUint256, {
+      await router.swapBNBForExactTokens(swapAmount, poolsPath, path, trader, Helper.MaxUint256, {
         from: trader,
         value: amounts[0].add(Helper.expandTo18Decimals(1)),
         gasPrice: new BN(0)

@@ -33,7 +33,9 @@
     "solhint": "./node_modules/.bin/solhint -f table 'contracts/**/*.sol'",
     "prettier": "./node_modules/.bin/prettier --write contracts/",
     "lint": "./node_modules/.bin/solhint -f table 'contracts/**/*.sol'",
-    "coverage": "./coverage.sh"
+    "coverage": "./coverage.sh",
+    "deploy:kovan": "yarn hardhat run --network kovan deployment/1.deploy.js",
+    "deploy:bsc": "yarn hardhat run --network bsc deployment/1.deploy.js"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "2.0.0",
@@ -57,7 +59,7 @@
     "typescript": "3.9.7",
     "web3": "1.2.6",
     "@uniswap/lib": "1.1.1",
-    "@uniswap/v2-periphery": "1.1.0-beta.0",
+    "@uniswap/v2-periphery": "git@github.com:sotatek-dev/buni-stable-coins-v2-periphery.git",
     "ethers": "5.0.0",
     "web3-eth-abi": "1.2.11"
   },

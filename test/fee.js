@@ -7,13 +7,13 @@ const BuniCornRouter02 = artifacts.require('BuniCornRouter02');
 const BuniCornPool = artifacts.require('BuniCornPool');
 const FeeTo = artifacts.require('FeeTo');
 const MockBuniCornDao = artifacts.require('MockBuniCornDao');
-const WETH = artifacts.require('WETH9');
+const WBNB = artifacts.require('WBNB9');
 const TestToken = artifacts.require('TestToken');
 
 let feeToSetter;
 let daoOperator;
 
-let weth;
+let wbnb;
 let token;
 
 contract('FeeTo', accounts => {
@@ -21,14 +21,14 @@ contract('FeeTo', accounts => {
     feeToSetter = accounts[1];
     daoOperator = accounts[2];
 
-    weth = await WETH.new();
+    wbnb = await WBNB.new();
     token = await TestToken.new('test', 't1', Helper.expandTo18Decimals(100000));
   });
 
   it('demo feeTo', async () => {
     let factory = await BuniCornFactory.new(feeToSetter);
-    await factory.createPool(weth.address, token.address, new BN(10000));
-    const poolAddress = await factory.getUnamplifiedPool(weth.address, token.address);
+    await factory.createPool(wbnb.address, token.address, new BN(10000));
+    const poolAddress = await factory.getUnamplifiedPool(wbnb.address, token.address);
     const pool = await BuniCornPool.at(poolAddress);
 
     /// setup dao and feeTo
@@ -39,10 +39,10 @@ contract('FeeTo', accounts => {
     await feeTo.setAllowedToken(pool.address, true, {from: daoOperator});
 
     /// setup router
-    let router = await BuniCornRouter02.new(factory.address, weth.address);
+    let router = await BuniCornRouter02.new(factory.address, wbnb.address);
 
     await token.approve(router.address, Helper.MaxUint256);
-    await router.addLiquidityETH(
+    await router.addLiquidityBNB(
       token.address,
       poolAddress,
       Helper.expandTo18Decimals(100),
@@ -53,10 +53,10 @@ contract('FeeTo', accounts => {
       {value: Helper.expandTo18Decimals(10)}
     );
 
-    let txResult = await router.swapExactETHForTokens(
+    let txResult = await router.swapExactBNBForTokens(
       new BN(0),
       [poolAddress],
-      [weth.address, token.address],
+      [wbnb.address, token.address],
       accounts[0],
       Helper.MaxUint256,
       {
@@ -67,10 +67,10 @@ contract('FeeTo', accounts => {
     /// test gascost with non-zero storage cost
     await dao.advanceEpoch();
     await feeTo.finalize(pool.address, new BN(1));
-    txResult = await router.swapExactETHForTokens(
+    txResult = await router.swapExactBNBForTokens(
       new BN(0),
       [poolAddress],
-      [weth.address, token.address],
+      [wbnb.address, token.address],
       accounts[0],
       Helper.MaxUint256,
       {

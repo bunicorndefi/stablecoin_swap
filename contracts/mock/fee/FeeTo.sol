@@ -96,7 +96,7 @@ contract FeeTo is DaoOperator, ReentrancyGuard {
     }
 
     /// @notice  WARNING When staker address is a contract,
-    ///          it should be able to receive claimed reward in ETH whenever anyone calls this function.
+    ///          it should be able to receive claimed reward in BNB whenever anyone calls this function.
     /// @dev not revert if already claimed or reward percentage is 0
     ///      allow writing a wrapper to claim for multiple epochs
     /// @param staker address.

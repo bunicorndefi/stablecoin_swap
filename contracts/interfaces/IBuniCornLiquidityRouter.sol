@@ -41,12 +41,12 @@ interface IBuniCornLiquidityRouter {
             uint256 liquidity
         );
 
-    function addLiquidityNewPoolETH(
+    function addLiquidityNewPoolBNB(
         IERC20 token,
         uint32 ampBps,
         uint256 amountTokenDesired,
         uint256 amountTokenMin,
-        uint256 amountETHMin,
+        uint256 amountBNBMin,
         address to,
         uint256 deadline
     )
@@ -54,16 +54,16 @@ interface IBuniCornLiquidityRouter {
         payable
         returns (
             uint256 amountToken,
-            uint256 amountETH,
+            uint256 amountBNB,
             uint256 liquidity
         );
 
-    function addLiquidityETH(
+    function addLiquidityBNB(
         IERC20 token,
         address pool,
         uint256 amountTokenDesired,
         uint256 amountTokenMin,
-        uint256 amountETHMin,
+        uint256 amountBNBMin,
         address to,
         uint256 deadline
     )
@@ -71,7 +71,7 @@ interface IBuniCornLiquidityRouter {
         payable
         returns (
             uint256 amountToken,
-            uint256 amountETH,
+            uint256 amountBNB,
             uint256 liquidity
         );
 
@@ -101,29 +101,29 @@ interface IBuniCornLiquidityRouter {
         bytes32 s
     ) external returns (uint256 amountA, uint256 amountB);
 
-    function removeLiquidityETH(
+    function removeLiquidityBNB(
         IERC20 token,
         address pool,
         uint256 liquidity,
         uint256 amountTokenMin,
-        uint256 amountETHMin,
+        uint256 amountBNBMin,
         address to,
         uint256 deadline
-    ) external returns (uint256 amountToken, uint256 amountETH);
+    ) external returns (uint256 amountToken, uint256 amountBNB);
 
-    function removeLiquidityETHWithPermit(
+    function removeLiquidityBNBWithPermit(
         IERC20 token,
         address pool,
         uint256 liquidity,
         uint256 amountTokenMin,
-        uint256 amountETHMin,
+        uint256 amountBNBMin,
         address to,
         uint256 deadline,
         bool approveMax,
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external returns (uint256 amountToken, uint256 amountETH);
+    ) external returns (uint256 amountToken, uint256 amountBNB);
 
     function quote(
         uint256 amountA,

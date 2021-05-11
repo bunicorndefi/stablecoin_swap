@@ -1,0 +1,30 @@
+{
+  "wbnb": "0x517281B6F8f98704A830863c5D0bfa209514AD3b",
+  "routerV2Address": "0xB21b3743B733158c93C11D6A29BDcBF7817c86AE",
+  "tokens": {
+    "BUSD": {
+      "id": "0x0675A944CbEa834cddA62F24a08cE42d0fbb83A3",
+      "name": "BUSD Token",
+      "symbol": "BUSD",
+      "decimals": 18
+    },
+    "USDT": {
+      "id": "0x9792F3977Ac74833EA55Da9B2Aa63277eaB05A5C",
+      "name": "Tether",
+      "symbol": "USDT",
+      "decimals": 6
+    },
+    "USDC": {
+      "id": "0x0B22E57e4e1E236f1E4C4d68c15E064E1Cc2e265",
+      "name": "USD Coin",
+      "symbol": "USDC",
+      "decimals": 6
+    },
+    "DAI": {
+      "id": "0xE680fA3CF20cAaB259Ab3E2d55a29C942ad72d01",
+      "name": "Dai Stablecoin",
+      "symbol": "DAI",
+      "decimals": 18
+    }
+  }
+}

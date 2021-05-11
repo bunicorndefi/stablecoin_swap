@@ -3,7 +3,7 @@ pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import "./IWETH.sol";
+import "./IWBNB.sol";
 import "./IBuniCornExchangeRouter.sol";
 import "./IBuniCornLiquidityRouter.sol";
 
@@ -11,5 +11,5 @@ import "./IBuniCornLiquidityRouter.sol";
 interface IBuniCornRouter01 is IBuniCornExchangeRouter, IBuniCornLiquidityRouter {
     function factory() external pure returns (address);
 
-    function weth() external pure returns (IWETH);
+    function wbnb() external pure returns (IWBNB);
 }

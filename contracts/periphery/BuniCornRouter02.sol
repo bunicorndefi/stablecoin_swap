@@ -10,31 +10,31 @@ import "../interfaces/IBuniCornFactory.sol";
 import "../interfaces/IBuniCornRouter02.sol";
 import "../interfaces/IERC20Permit.sol";
 import "../interfaces/IBuniCornPool.sol";
-import "../interfaces/IWETH.sol";
+import "../interfaces/IWBNB.sol";
 import "../libraries/BuniCornLibrary.sol";
 
 contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
     using SafeERC20 for IERC20;
-    using SafeERC20 for IWETH;
+    using SafeERC20 for IWBNB;
     using SafeMath for uint256;
 
     uint256 internal constant BPS = 10000;
 
     address public immutable override factory;
-    IWETH public immutable override weth;
+    IWBNB public immutable override wbnb;
 
     modifier ensure(uint256 deadline) {
         require(deadline >= block.timestamp, "BUNIROUTER: EXPIRED");
         _;
     }
 
-    constructor(address _factory, IWETH _weth) public {
+    constructor(address _factory, IWBNB _wbnb) public {
         factory = _factory;
-        weth = _weth;
+        wbnb = _wbnb;
     }
 
     receive() external payable {
-        assert(msg.sender == address(weth)); // only accept ETH via fallback from the WETH contract
+        assert(msg.sender == address(wbnb)); // only accept BNB via fallback from the WBNB contract
     }
 
     // **** ADD LIQUIDITY ****
@@ -101,12 +101,12 @@ contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
         liquidity = IBuniCornPool(pool).mint(to);
     }
 
-    function addLiquidityETH(
+    function addLiquidityBNB(
         IERC20 token,
         address pool,
         uint256 amountTokenDesired,
         uint256 amountTokenMin,
-        uint256 amountETHMin,
+        uint256 amountBNBMin,
         address to,
         uint256 deadline
     )
@@ -116,27 +116,27 @@ contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
         ensure(deadline)
         returns (
             uint256 amountToken,
-            uint256 amountETH,
+            uint256 amountBNB,
             uint256 liquidity
         )
     {
-        verifyPoolAddress(token, weth, pool);
-        (amountToken, amountETH) = _addLiquidity(
+        verifyPoolAddress(token, wbnb, pool);
+        (amountToken, amountBNB) = _addLiquidity(
             token,
-            weth,
+            wbnb,
             pool,
             amountTokenDesired,
             msg.value,
             amountTokenMin,
-            amountETHMin
+            amountBNBMin
         );
         token.safeTransferFrom(msg.sender, pool, amountToken);
-        weth.deposit{value: amountETH}();
-        weth.safeTransfer(pool, amountETH);
+        wbnb.deposit{value: amountBNB}();
+        wbnb.safeTransfer(pool, amountBNB);
         liquidity = IBuniCornPool(pool).mint(to);
-        // refund dust eth, if any
-        if (msg.value > amountETH) {
-            TransferHelper.safeTransferETH(msg.sender, msg.value - amountETH);
+        // refund dust bnb, if any
+        if (msg.value > amountBNB) {
+            TransferHelper.safeTransferETH(msg.sender, msg.value - amountBNB);
         }
     }
 
@@ -182,12 +182,12 @@ contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
     }
 
     // *notes*: only allow the contract owner to create new pool
-    function addLiquidityNewPoolETH(
+    function addLiquidityNewPoolBNB(
         IERC20 token,
         uint32 ampBps,
         uint256 amountTokenDesired,
         uint256 amountTokenMin,
-        uint256 amountETHMin,
+        uint256 amountBNBMin,
         address to,
         uint256 deadline
     )
@@ -197,23 +197,23 @@ contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
         onlyOwner
         returns (
             uint256 amountToken,
-            uint256 amountETH,
+            uint256 amountBNB,
             uint256 liquidity
         )
     {
         address pool;
         if (ampBps == BPS) {
-            pool = IBuniCornFactory(factory).getUnamplifiedPool(token, weth);
+            pool = IBuniCornFactory(factory).getUnamplifiedPool(token, wbnb);
         }
         if (pool == address(0)) {
-            pool = IBuniCornFactory(factory).createPool(token, weth, ampBps);
+            pool = IBuniCornFactory(factory).createPool(token, wbnb, ampBps);
         }
-        (amountToken, amountETH, liquidity) = addLiquidityETH(
+        (amountToken, amountBNB, liquidity) = addLiquidityBNB(
             token,
             pool,
             amountTokenDesired,
             amountTokenMin,
-            amountETHMin,
+            amountBNBMin,
             to,
             deadline
         );
@@ -239,28 +239,28 @@ contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
         require(amountB >= amountBMin, "BUNIROUTER: INSUFFICIENT_B_AMOUNT");
     }
 
-    function removeLiquidityETH(
+    function removeLiquidityBNB(
         IERC20 token,
         address pool,
         uint256 liquidity,
         uint256 amountTokenMin,
-        uint256 amountETHMin,
+        uint256 amountBNBMin,
         address to,
         uint256 deadline
-    ) public override ensure(deadline) returns (uint256 amountToken, uint256 amountETH) {
-        (amountToken, amountETH) = removeLiquidity(
+    ) public override ensure(deadline) returns (uint256 amountToken, uint256 amountBNB) {
+        (amountToken, amountBNB) = removeLiquidity(
             token,
-            weth,
+            wbnb,
             pool,
             liquidity,
             amountTokenMin,
-            amountETHMin,
+            amountBNBMin,
             address(this),
             deadline
         );
         token.safeTransfer(to, amountToken);
-        IWETH(weth).withdraw(amountETH);
-        TransferHelper.safeTransferETH(to, amountETH);
+        IWBNB(wbnb).withdraw(amountBNB);
+        TransferHelper.safeTransferETH(to, amountBNB);
     }
 
     function removeLiquidityWithPermit(
@@ -291,27 +291,27 @@ contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
         );
     }
 
-    function removeLiquidityETHWithPermit(
+    function removeLiquidityBNBWithPermit(
         IERC20 token,
         address pool,
         uint256 liquidity,
         uint256 amountTokenMin,
-        uint256 amountETHMin,
+        uint256 amountBNBMin,
         address to,
         uint256 deadline,
         bool approveMax,
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external override returns (uint256 amountToken, uint256 amountETH) {
+    ) external override returns (uint256 amountToken, uint256 amountBNB) {
         uint256 value = approveMax ? uint256(-1) : liquidity;
         IERC20Permit(pool).permit(msg.sender, address(this), value, deadline, v, r, s);
-        (amountToken, amountETH) = removeLiquidityETH(
+        (amountToken, amountBNB) = removeLiquidityBNB(
             token,
             pool,
             liquidity,
             amountTokenMin,
-            amountETHMin,
+            amountBNBMin,
             to,
             deadline
         );
@@ -319,51 +319,51 @@ contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
 
     // **** REMOVE LIQUIDITY (supporting fee-on-transfer tokens) ****
 
-    function removeLiquidityETHSupportingFeeOnTransferTokens(
+    function removeLiquidityBNBSupportingFeeOnTransferTokens(
         IERC20 token,
         address pool,
         uint256 liquidity,
         uint256 amountTokenMin,
-        uint256 amountETHMin,
+        uint256 amountBNBMin,
         address to,
         uint256 deadline
-    ) public override ensure(deadline) returns (uint256 amountETH) {
-        (, amountETH) = removeLiquidity(
+    ) public override ensure(deadline) returns (uint256 amountBNB) {
+        (, amountBNB) = removeLiquidity(
             token,
-            weth,
+            wbnb,
             pool,
             liquidity,
             amountTokenMin,
-            amountETHMin,
+            amountBNBMin,
             address(this),
             deadline
         );
         token.safeTransfer(to, IERC20(token).balanceOf(address(this)));
-        IWETH(weth).withdraw(amountETH);
-        TransferHelper.safeTransferETH(to, amountETH);
+        IWBNB(wbnb).withdraw(amountBNB);
+        TransferHelper.safeTransferETH(to, amountBNB);
     }
 
-    function removeLiquidityETHWithPermitSupportingFeeOnTransferTokens(
+    function removeLiquidityBNBWithPermitSupportingFeeOnTransferTokens(
         IERC20 token,
         address pool,
         uint256 liquidity,
         uint256 amountTokenMin,
-        uint256 amountETHMin,
+        uint256 amountBNBMin,
         address to,
         uint256 deadline,
         bool approveMax,
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external override returns (uint256 amountETH) {
+    ) external override returns (uint256 amountBNB) {
         uint256 value = approveMax ? uint256(-1) : liquidity;
         IERC20Permit(pool).permit(msg.sender, address(this), value, deadline, v, r, s);
-        amountETH = removeLiquidityETHSupportingFeeOnTransferTokens(
+        amountBNB = removeLiquidityBNBSupportingFeeOnTransferTokens(
             token,
             pool,
             liquidity,
             amountTokenMin,
-            amountETHMin,
+            amountBNBMin,
             to,
             deadline
         );
@@ -422,26 +422,26 @@ contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
         _swap(amounts, poolsPath, path, to);
     }
 
-    function swapExactETHForTokens(
+    function swapExactBNBForTokens(
         uint256 amountOutMin,
         address[] calldata poolsPath,
         IERC20[] calldata path,
         address to,
         uint256 deadline
     ) external override payable ensure(deadline) returns (uint256[] memory amounts) {
-        require(path[0] == weth, "BUNIROUTER: INVALID_PATH");
+        require(path[0] == wbnb, "BUNIROUTER: INVALID_PATH");
         verifyPoolsPathSwap(poolsPath, path);
         amounts = BuniCornLibrary.getAmountsOut(msg.value, poolsPath, path);
         require(
             amounts[amounts.length - 1] >= amountOutMin,
             "BUNIROUTER: INSUFFICIENT_OUTPUT_AMOUNT"
         );
-        IWETH(weth).deposit{value: amounts[0]}();
-        weth.safeTransfer(poolsPath[0], amounts[0]);
+        IWBNB(wbnb).deposit{value: amounts[0]}();
+        wbnb.safeTransfer(poolsPath[0], amounts[0]);
         _swap(amounts, poolsPath, path, to);
     }
 
-    function swapTokensForExactETH(
+    function swapTokensForExactBNB(
         uint256 amountOut,
         uint256 amountInMax,
         address[] calldata poolsPath,
@@ -449,17 +449,17 @@ contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
         address to,
         uint256 deadline
     ) external override ensure(deadline) returns (uint256[] memory amounts) {
-        require(path[path.length - 1] == weth, "BUNIROUTER: INVALID_PATH");
+        require(path[path.length - 1] == wbnb, "BUNIROUTER: INVALID_PATH");
         verifyPoolsPathSwap(poolsPath, path);
         amounts = BuniCornLibrary.getAmountsIn(amountOut, poolsPath, path);
         require(amounts[0] <= amountInMax, "BUNIROUTER: EXCESSIVE_INPUT_AMOUNT");
         path[0].safeTransferFrom(msg.sender, poolsPath[0], amounts[0]);
         _swap(amounts, poolsPath, path, address(this));
-        IWETH(weth).withdraw(amounts[amounts.length - 1]);
+        IWBNB(wbnb).withdraw(amounts[amounts.length - 1]);
         TransferHelper.safeTransferETH(to, amounts[amounts.length - 1]);
     }
 
-    function swapExactTokensForETH(
+    function swapExactTokensForBNB(
         uint256 amountIn,
         uint256 amountOutMin,
         address[] calldata poolsPath,
@@ -467,7 +467,7 @@ contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
         address to,
         uint256 deadline
     ) external override ensure(deadline) returns (uint256[] memory amounts) {
-        require(path[path.length - 1] == weth, "BUNIROUTER: INVALID_PATH");
+        require(path[path.length - 1] == wbnb, "BUNIROUTER: INVALID_PATH");
         verifyPoolsPathSwap(poolsPath, path);
         amounts = BuniCornLibrary.getAmountsOut(amountIn, poolsPath, path);
         require(
@@ -476,25 +476,25 @@ contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
         );
         path[0].safeTransferFrom(msg.sender, poolsPath[0], amounts[0]);
         _swap(amounts, poolsPath, path, address(this));
-        IWETH(weth).withdraw(amounts[amounts.length - 1]);
+        IWBNB(wbnb).withdraw(amounts[amounts.length - 1]);
         TransferHelper.safeTransferETH(to, amounts[amounts.length - 1]);
     }
 
-    function swapETHForExactTokens(
+    function swapBNBForExactTokens(
         uint256 amountOut,
         address[] calldata poolsPath,
         IERC20[] calldata path,
         address to,
         uint256 deadline
     ) external override payable ensure(deadline) returns (uint256[] memory amounts) {
-        require(path[0] == weth, "BUNIROUTER: INVALID_PATH");
+        require(path[0] == wbnb, "BUNIROUTER: INVALID_PATH");
         verifyPoolsPathSwap(poolsPath, path);
         amounts = BuniCornLibrary.getAmountsIn(amountOut, poolsPath, path);
         require(amounts[0] <= msg.value, "BUNIROUTER: EXCESSIVE_INPUT_AMOUNT");
-        IWETH(weth).deposit{value: amounts[0]}();
-        weth.safeTransfer(poolsPath[0], amounts[0]);
+        IWBNB(wbnb).deposit{value: amounts[0]}();
+        wbnb.safeTransfer(poolsPath[0], amounts[0]);
         _swap(amounts, poolsPath, path, to);
-        // refund dust eth, if any
+        // refund dust bnb, if any
         if (msg.value > amounts[0]) {
             TransferHelper.safeTransferETH(msg.sender, msg.value - amounts[0]);
         }
@@ -558,17 +558,17 @@ contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
         );
     }
 
-    function swapExactETHForTokensSupportingFeeOnTransferTokens(
+    function swapExactBNBForTokensSupportingFeeOnTransferTokens(
         uint256 amountOutMin,
         address[] calldata poolsPath,
         IERC20[] calldata path,
         address to,
         uint256 deadline
     ) external override payable ensure(deadline) {
-        require(path[0] == weth, "BUNIROUTER: INVALID_PATH");
+        require(path[0] == wbnb, "BUNIROUTER: INVALID_PATH");
         uint256 amountIn = msg.value;
-        IWETH(weth).deposit{value: amountIn}();
-        weth.safeTransfer(poolsPath[0], amountIn);
+        IWBNB(wbnb).deposit{value: amountIn}();
+        wbnb.safeTransfer(poolsPath[0], amountIn);
         uint256 balanceBefore = IERC20(path[path.length - 1]).balanceOf(to);
         _swapSupportingFeeOnTransferTokens(poolsPath, path, to);
         require(
@@ -577,7 +577,7 @@ contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
         );
     }
 
-    function swapExactTokensForETHSupportingFeeOnTransferTokens(
+    function swapExactTokensForBNBSupportingFeeOnTransferTokens(
         uint256 amountIn,
         uint256 amountOutMin,
         address[] calldata poolsPath,
@@ -585,12 +585,12 @@ contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
         address to,
         uint256 deadline
     ) external override ensure(deadline) {
-        require(path[path.length - 1] == weth, "BUNIROUTER: INVALID_PATH");
+        require(path[path.length - 1] == wbnb, "BUNIROUTER: INVALID_PATH");
         path[0].safeTransferFrom(msg.sender, poolsPath[0], amountIn);
         _swapSupportingFeeOnTransferTokens(poolsPath, path, address(this));
-        uint256 amountOut = IWETH(weth).balanceOf(address(this));
+        uint256 amountOut = IWBNB(wbnb).balanceOf(address(this));
         require(amountOut >= amountOutMin, "BUNIROUTER: INSUFFICIENT_OUTPUT_AMOUNT");
-        IWETH(weth).withdraw(amountOut);
+        IWBNB(wbnb).withdraw(amountOut);
         TransferHelper.safeTransferETH(to, amountOut);
     }
 

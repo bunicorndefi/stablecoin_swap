@@ -7,25 +7,25 @@ import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 import "../interfaces/IBuniCornCallee.sol";
 import "../interfaces/IBuniCornFactory.sol";
 import "../interfaces/IBuniCornPool.sol";
-import "../interfaces/IWETH.sol";
+import "../interfaces/IWBNB.sol";
 import "../libraries/BuniCornLibrary.sol";
 
 contract ExampleFlashSwap is IBuniCornCallee {
     using SafeERC20 for IERC20;
 
     address public immutable factory;
-    IWETH public immutable weth;
+    IWBNB public immutable wbnb;
     IUniswapV2Router02 public uniswapRounter02;
 
     constructor(IUniswapV2Router02 _uniswapRounter02, address _factory) public {
         uniswapRounter02 = _uniswapRounter02;
-        weth = IWETH(_uniswapRounter02.WETH());
+        wbnb = IWBNB(_uniswapRounter02.WBNB());
         factory = _factory;
     }
 
     receive() external payable {}
 
-    // gets tokens/WETH via a BUNI flash swap, swaps for the WETH/tokens on uniswapV2, repays BUNI, and keeps the rest!
+    // gets tokens/WBNB via a BUNI flash swap, swaps for the WBNB/tokens on uniswapV2, repays BUNI, and keeps the rest!
     function buniSwapCall(
         address sender,
         uint256 amount0,
@@ -38,7 +38,7 @@ contract ExampleFlashSwap is IBuniCornCallee {
         poolsPath[0] = msg.sender;
 
         uint256 amountToken;
-        uint256 amountETH;
+        uint256 amountBNB;
         {
             // scope for token{0,1}, avoids stack too deep errors
             IERC20 token0 = IBuniCornPool(msg.sender).token0();
@@ -50,33 +50,33 @@ contract ExampleFlashSwap is IBuniCornCallee {
             path2[0] = address(path[1]);
             path2[1] = address(path[0]);
 
-            amountToken = token0 == IERC20(weth) ? amount1 : amount0;
-            amountETH = token0 == IERC20(weth) ? amount0 : amount1;
+            amountToken = token0 == IERC20(wbnb) ? amount1 : amount0;
+            amountBNB = token0 == IERC20(wbnb) ? amount0 : amount1;
         }
-        assert(path[0] == IERC20(weth) || path[1] == IERC20(weth)); // this strategy only works with a V2 WETH pool
+        assert(path[0] == IERC20(wbnb) || path[1] == IERC20(wbnb)); // this strategy only works with a V2 WBNB pool
 
         if (amountToken > 0) {
-            uint256 minETH = abi.decode(data, (uint256)); // slippage parameter for V1, passed in by caller
+            uint256 minBNB = abi.decode(data, (uint256)); // slippage parameter for V1, passed in by caller
             uint256 amountRequired = BuniCornLibrary.getAmountsIn(amountToken, poolsPath, path)[0];
             path[1].safeApprove(address(uniswapRounter02), amountToken);
             uint256[] memory amounts = uniswapRounter02.swapExactTokensForTokens(
                 amountToken,
-                minETH,
+                minBNB,
                 path2,
                 address(this),
                 uint256(-1)
             );
             uint256 amountReceived = amounts[amounts.length - 1];
-            assert(amountReceived > amountRequired); // fail if we didn't get enough ETH back to repay our flash loan
+            assert(amountReceived > amountRequired); // fail if we didn't get enough BNB back to repay our flash loan
 
-            weth.transfer(msg.sender, amountRequired);
-            weth.withdraw(amountReceived - amountRequired);
+            wbnb.transfer(msg.sender, amountRequired);
+            wbnb.withdraw(amountReceived - amountRequired);
             (bool success, ) = sender.call{value: amountReceived - amountRequired}(new bytes(0));
-            require(success, "transfer eth failed");
+            require(success, "transfer bnb failed");
         } else {
-            weth.withdraw(amountETH);
-            uint256 amountRequired = BuniCornLibrary.getAmountsIn(amountETH, poolsPath, path)[0];
-            uint256[] memory amounts = uniswapRounter02.swapETHForExactTokens{value: amountETH}(
+            wbnb.withdraw(amountBNB);
+            uint256 amountRequired = BuniCornLibrary.getAmountsIn(amountBNB, poolsPath, path)[0];
+            uint256[] memory amounts = uniswapRounter02.swapBNBForExactTokens{value: amountBNB}(
                 amountRequired,
                 path2,
                 address(this),
@@ -84,9 +84,9 @@ contract ExampleFlashSwap is IBuniCornCallee {
             );
 
             path[0].safeTransfer(msg.sender, amountRequired);
-            assert(amountETH > amounts[0]); // fail if we didn't get enough tokens back to repay our flash loan
-            (bool success, ) = sender.call{value: amountETH - amounts[0]}(new bytes(0));
-            require(success, "transfer eth failed");
+            assert(amountBNB > amounts[0]); // fail if we didn't get enough tokens back to repay our flash loan
+            (bool success, ) = sender.call{value: amountBNB - amounts[0]}(new bytes(0));
+            require(success, "transfer bnb failed");
         }
     }
 }

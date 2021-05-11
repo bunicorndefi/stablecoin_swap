@@ -2,7 +2,7 @@ const TestToken = artifacts.require('TestToken');
 const BuniCornFactory = artifacts.require('BuniCornFactory');
 const BuniCornRouterV2 = artifacts.require('BuniCornRouter02');
 const BuniCornPool = artifacts.require('BuniCornPool');
-const WETH = artifacts.require('WETH9');
+const WBNB = artifacts.require('WBNB9');
 
 const Helper = require('./helper');
 
@@ -22,8 +22,8 @@ contract('BuniCornFactory', function (accounts) {
     feeToSetter = accounts[1];
     feeTo = accounts[2];
     factory = await BuniCornFactory.new(feeToSetter, { from: accounts[0] });
-    const weth = await WETH.new();
-    router = await BuniCornRouterV2.new(factory.address, weth.address, { from: accounts[0] });
+    const wbnb = await WBNB.new();
+    router = await BuniCornRouterV2.new(factory.address, wbnb.address, { from: accounts[0] });
 
     tokenA = await TestToken.new('test token A', 'A', Helper.expandTo18Decimals(10000));
     tokenB = await TestToken.new('test token B', 'B', Helper.expandTo18Decimals(10000));
