@@ -4,6 +4,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/math/Math.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 import "./libraries/MathExt.sol";
@@ -16,9 +17,13 @@ import "./interfaces/IBuniCornPool.sol";
 import "./interfaces/IERC20Metadata.sol";
 import "./VolumeTrendRecorder.sol";
 
-contract BuniCornPool is IBuniCornPool, ERC20Permit, ReentrancyGuard, VolumeTrendRecorder {
+contract BuniCornPool is IBuniCornPool, ERC20Permit, ReentrancyGuard, VolumeTrendRecorder, Pausable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
+
+    // handling mechanism to protect the pool
+    // the author can stop the swap and burn method when the pool is at risk
+    address public author = 0xc783df8a850f42e7F7e57013759C285caa701eB6; // TODO: will update later
 
     uint256 internal constant MAX_UINT112 = 2**112 - 1;
     uint256 internal constant BPS = 10000;
@@ -59,6 +64,11 @@ contract BuniCornPool is IBuniCornPool, ERC20Permit, ReentrancyGuard, VolumeTren
         uint256 feeInPrecision
     );
     event Sync(uint256 vReserve0, uint256 vReserve1, uint256 reserve0, uint256 reserve1);
+
+    modifier onlyAuthor() {
+        require(msg.sender == author, "BUNI: caller is not the author");
+        _;
+    }
 
     constructor() public ERC20Permit("Buni Pool Token", "BPT", "1") VolumeTrendRecorder(0) {
         factory = IBuniCornFactory(msg.sender);
@@ -122,6 +132,7 @@ contract BuniCornPool is IBuniCornPool, ERC20Permit, ReentrancyGuard, VolumeTren
         external
         override
         nonReentrant
+        whenNotPaused
         returns (uint256 amount0, uint256 amount1)
     {
         (bool isAmpPool, ReserveData memory data) = getReservesData(); // gas savings
@@ -164,7 +175,7 @@ contract BuniCornPool is IBuniCornPool, ERC20Permit, ReentrancyGuard, VolumeTren
         uint256 amount1Out,
         address to,
         bytes calldata callbackData
-    ) external override nonReentrant {
+    ) external override nonReentrant whenNotPaused {
         require(amount0Out > 0 || amount1Out > 0, "BUNI: INSUFFICIENT_OUTPUT_AMOUNT");
         (bool isAmpPool, ReserveData memory data) = getReservesData(); // gas savings
         require(
@@ -373,4 +384,18 @@ contract BuniCornPool is IBuniCornPool, ERC20Permit, ReentrancyGuard, VolumeTren
         require(x <= MAX_UINT112, "BUNI: OVERFLOW");
         return uint112(x);
     }
+
+    /**
+	 * @dev Called by a author to pause, triggers stopped state.
+	 */
+	function pause() public onlyAuthor whenNotPaused {
+		_pause();
+	}
+
+	/**
+	 * @dev Called by a author to unpause, returns to normal state.
+	 */
+	function unpause() public onlyAuthor whenPaused {
+        _unpause();
+	}
 }

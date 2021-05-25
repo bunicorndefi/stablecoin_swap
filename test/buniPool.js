@@ -172,151 +172,325 @@ contract('BuniCornPool', function (accounts) {
 
     swapTestCases.forEach((testCase, i) => {
       const [swapAmount, token0Amount, token1Amount] = testCase;
-      it(`getInputPrice:${i} unamplified pool`, async () => {
-        [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps);
-        await addLiquidity(
-          liquidityProvider,
-          pool,
-          expandTo18Decimals(token0Amount),
-          expandTo18Decimals(token1Amount)
-        );
-        await token0.transfer(pool.address, expandTo18Decimals(swapAmount));
-        let expectedOutputAmount = await buniHelper.getAmountOut(expandTo18Decimals(swapAmount), token0, pool);
-        await expectRevert(pool.swap(0, expectedOutputAmount.add(new BN(1)), trader, '0x'), 'BUNI: K');
-        await pool.swap(0, new BN(expectedOutputAmount), trader, '0x');
+
+      describe(`getInputPrice:${i} unamplified pool`, () => {
+        it('can swap when pool is not pause', async () => {
+          [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps);
+          await addLiquidity(
+            liquidityProvider,
+            pool,
+            expandTo18Decimals(token0Amount),
+            expandTo18Decimals(token1Amount)
+          );
+          await token0.transfer(pool.address, expandTo18Decimals(swapAmount));
+          let expectedOutputAmount = await buniHelper.getAmountOut(expandTo18Decimals(swapAmount), token0, pool);
+          await expectRevert(pool.swap(0, expectedOutputAmount.add(new BN(1)), trader, '0x'), 'BUNI: K');
+          await pool.swap(0, new BN(expectedOutputAmount), trader, '0x');
+        });
+
+        it('cannot swap when pool is paused', async () => {
+          [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps);
+          await addLiquidity(
+            liquidityProvider,
+            pool,
+            expandTo18Decimals(token0Amount),
+            expandTo18Decimals(token1Amount)
+          );
+          await token0.transfer(pool.address, expandTo18Decimals(swapAmount));
+          let expectedOutputAmount = await buniHelper.getAmountOut(expandTo18Decimals(swapAmount), token0, pool);
+          await expectRevert(pool.swap(0, expectedOutputAmount.add(new BN(1)), trader, '0x'), 'BUNI: K');
+          // call pause method from author
+          await pool.pause({ from: accounts[0] });
+          // should revert
+          await expectRevert(pool.swap(0, new BN(expectedOutputAmount), trader, '0x'), 'Pausable: paused');
+        });
       });
 
-      it(`getInputPrice:${i} amp pool`, async () => {
+      describe(`getInputPrice:${i} amp pool`, () => {
+        it('can swap when pool is not pause', async () => {
+          [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+          await addLiquidity(
+            liquidityProvider,
+            pool,
+            expandTo18Decimals(token0Amount),
+            expandTo18Decimals(token1Amount)
+          );
+          await token0.transfer(pool.address, expandTo18Decimals(swapAmount));
+          let amountOut = await buniHelper.getAmountOut(expandTo18Decimals(swapAmount), token0, pool);
+          await expectRevert(pool.swap(0, amountOut.add(new BN(1)), trader, '0x'), 'BUNI: K');
+          await pool.swap(0, new BN(amountOut), trader, '0x');
+        });
+
+        it('cannot swap when pool is paused', async () => {
+          [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+          await addLiquidity(
+            liquidityProvider,
+            pool,
+            expandTo18Decimals(token0Amount),
+            expandTo18Decimals(token1Amount)
+          );
+          await token0.transfer(pool.address, expandTo18Decimals(swapAmount));
+          let amountOut = await buniHelper.getAmountOut(expandTo18Decimals(swapAmount), token0, pool);
+          await expectRevert(pool.swap(0, amountOut.add(new BN(1)), trader, '0x'), 'BUNI: K');
+          // call pause method from author
+          await pool.pause({ from: accounts[0] });
+          // should revert
+          await expectRevert(pool.swap(0, new BN(amountOut), trader, '0x'), 'Pausable: paused');
+        });
+      });
+    });
+
+    describe('swap:token0 amp pool', () => {
+      it('can swap when pool is not pause', async () => {
         [factory, pool] = await setupPool(admin, token0, token1, ampBps);
-        await addLiquidity(
-          liquidityProvider,
-          pool,
-          expandTo18Decimals(token0Amount),
-          expandTo18Decimals(token1Amount)
+        const token0Amount = expandTo18Decimals(5);
+        const token1Amount = expandTo18Decimals(10);
+        const swapAmount = expandTo18Decimals(1);
+
+        await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
+
+        let amountOut = await buniHelper.getAmountOut(swapAmount, token0.address, pool);
+        // when amountIn = 0 -> revert
+        await expectRevert(pool.swap(new BN(0), amountOut, trader, '0x', {from: app}), 'BUNI: INSUFFICIENT_INPUT_AMOUNT');
+
+        // when amountOut = 0 -> revert
+        await token0.transfer(pool.address, swapAmount);
+        await expectRevert(
+          pool.swap(new BN(0), new BN(0), trader, '0x', {from: app}),
+          'BUNI: INSUFFICIENT_OUTPUT_AMOUNT'
         );
-        await token0.transfer(pool.address, expandTo18Decimals(swapAmount));
-        let amountOut = await buniHelper.getAmountOut(expandTo18Decimals(swapAmount), token0, pool);
-        await expectRevert(pool.swap(0, amountOut.add(new BN(1)), trader, '0x'), 'BUNI: K');
-        await pool.swap(0, new BN(amountOut), trader, '0x');
+        // when amountOut > liquidity -> revert
+        await expectRevert(
+          pool.swap(new BN(0), token1Amount.add(new BN(1)), trader, '0x', {from: app}),
+          'BUNI: INSUFFICIENT_LIQUIDITY'
+        );
+        // revert when destAddres is token0 or token1
+        await expectRevert(pool.swap(new BN(0), amountOut, token0.address, '0x', {from: app}), 'BUNI: INVALID_TO');
+        // normal swap if everything is valid
+        await token1.transfer(trader, new BN(1));
+
+        let beforeBalanceToken0 = await token0.balanceOf(trader);
+        let beforeBalanceToken1 = await token1.balanceOf(trader);
+        let txResult = await pool.swap(new BN(0), amountOut, trader, '0x', {from: app});
+
+        expectEvent(txResult, 'Sync', {
+          reserve0: token0Amount.add(swapAmount),
+          reserve1: token1Amount.sub(amountOut)
+        });
+
+        expectEvent(txResult, 'Swap', {
+          sender: app,
+          amount0In: swapAmount,
+          amount1In: new BN(0),
+          amount0Out: new BN(0),
+          amount1Out: amountOut,
+          to: trader
+        });
+
+        Helper.assertEqual(await token0.balanceOf(pool.address), token0Amount.add(swapAmount));
+        Helper.assertEqual(await token1.balanceOf(pool.address), token1Amount.sub(amountOut));
+        // balance of token0 should be unchanged after transfer
+        Helper.assertEqual(await token0.balanceOf(trader), beforeBalanceToken0);
+        // balance of token1 should increase by amountOut
+        Helper.assertEqual(await token1.balanceOf(trader), beforeBalanceToken1.add(amountOut));
+        // this number of uniswap is 73462
+        console.log(`amp pool swap gasUsed = ${txResult.receipt.gasUsed}`);
+      });
+
+      it('cannot swap when pool is paused', async () => {
+        [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+        const token0Amount = expandTo18Decimals(5);
+        const token1Amount = expandTo18Decimals(10);
+        const swapAmount = expandTo18Decimals(1);
+
+        await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
+
+        let amountOut = await buniHelper.getAmountOut(swapAmount, token0.address, pool);
+        // when amountIn = 0 -> revert
+        await expectRevert(pool.swap(new BN(0), amountOut, trader, '0x', {from: app}), 'BUNI: INSUFFICIENT_INPUT_AMOUNT');
+
+        // when amountOut = 0 -> revert
+        await token0.transfer(pool.address, swapAmount);
+        await expectRevert(
+          pool.swap(new BN(0), new BN(0), trader, '0x', {from: app}),
+          'BUNI: INSUFFICIENT_OUTPUT_AMOUNT'
+        );
+        // when amountOut > liquidity -> revert
+        await expectRevert(
+          pool.swap(new BN(0), token1Amount.add(new BN(1)), trader, '0x', {from: app}),
+          'BUNI: INSUFFICIENT_LIQUIDITY'
+        );
+        // revert when destAddres is token0 or token1
+        await expectRevert(pool.swap(new BN(0), amountOut, token0.address, '0x', {from: app}), 'BUNI: INVALID_TO');
+        // normal swap if everything is valid
+        await token1.transfer(trader, new BN(1));
+        // call pause method from author
+        await pool.pause({ from: accounts[0] });
+        // should revert
+        await expectRevert(pool.swap(new BN(0), amountOut, trader, '0x', {from: app}), 'Pausable: paused');
       });
     });
 
-    it('swap:token0 amp pool', async () => {
-      [factory, pool] = await setupPool(admin, token0, token1, ampBps);
-      const token0Amount = expandTo18Decimals(5);
-      const token1Amount = expandTo18Decimals(10);
-      const swapAmount = expandTo18Decimals(1);
+    describe('swap:token0 unamplified pool', () => {
+      it('can swap when pool is not pause', async () => {
+        [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps);
+        const token0Amount = expandTo18Decimals(5);
+        const token1Amount = expandTo18Decimals(10);
+        const swapAmount = expandTo18Decimals(1);
 
-      await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
+        await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
 
-      let amountOut = await buniHelper.getAmountOut(swapAmount, token0.address, pool);
-      // when amountIn = 0 -> revert
-      await expectRevert(pool.swap(new BN(0), amountOut, trader, '0x', {from: app}), 'BUNI: INSUFFICIENT_INPUT_AMOUNT');
+        let amountOut = await buniHelper.getAmountOut(swapAmount, token0.address, pool);
+        // when amountIn = 0 -> revert
+        await expectRevert(pool.swap(new BN(0), amountOut, trader, '0x', {from: app}), 'BUNI: INSUFFICIENT_INPUT_AMOUNT');
 
-      // when amountOut = 0 -> revert
-      await token0.transfer(pool.address, swapAmount);
-      await expectRevert(
-        pool.swap(new BN(0), new BN(0), trader, '0x', {from: app}),
-        'BUNI: INSUFFICIENT_OUTPUT_AMOUNT'
-      );
-      // when amountOut > liquidity -> revert
-      await expectRevert(
-        pool.swap(new BN(0), token1Amount.add(new BN(1)), trader, '0x', {from: app}),
-        'BUNI: INSUFFICIENT_LIQUIDITY'
-      );
-      // revert when destAddres is token0 or token1
-      await expectRevert(pool.swap(new BN(0), amountOut, token0.address, '0x', {from: app}), 'BUNI: INVALID_TO');
-      // normal swap if everything is valid
-      await token1.transfer(trader, new BN(1));
+        // when amountOut = 0 -> revert
+        await token0.transfer(pool.address, swapAmount);
+        await expectRevert(
+          pool.swap(new BN(0), new BN(0), trader, '0x', {from: app}),
+          'BUNI: INSUFFICIENT_OUTPUT_AMOUNT'
+        );
+        // when amountOut > liquidity -> revert
+        await expectRevert(
+          pool.swap(new BN(0), token1Amount.add(new BN(1)), trader, '0x', {from: app}),
+          'BUNI: INSUFFICIENT_LIQUIDITY'
+        );
+        // revert when destAddres is token0 or token1
+        await expectRevert(pool.swap(new BN(0), amountOut, token0.address, '0x', {from: app}), 'BUNI: INVALID_TO');
+        // normal swap if everything is valid
+        await token1.transfer(trader, new BN(1));
 
-      let beforeBalanceToken0 = await token0.balanceOf(trader);
-      let beforeBalanceToken1 = await token1.balanceOf(trader);
-      let txResult = await pool.swap(new BN(0), amountOut, trader, '0x', {from: app});
+        let beforeBalanceToken0 = await token0.balanceOf(trader);
+        let beforeBalanceToken1 = await token1.balanceOf(trader);
+        let txResult = await pool.swap(new BN(0), amountOut, trader, '0x', {from: app});
 
-      expectEvent(txResult, 'Sync', {
-        reserve0: token0Amount.add(swapAmount),
-        reserve1: token1Amount.sub(amountOut)
+        expectEvent(txResult, 'Sync', {
+          reserve0: token0Amount.add(swapAmount),
+          reserve1: token1Amount.sub(amountOut),
+          vReserve0: new BN(0),
+          vReserve1: new BN(0)
+        });
+
+        expectEvent(txResult, 'Swap', {
+          sender: app,
+          amount0In: swapAmount,
+          amount1In: new BN(0),
+          amount0Out: new BN(0),
+          amount1Out: amountOut,
+          to: trader
+        });
+
+        const tradeInfo = await pool.getTradeInfo();
+        Helper.assertEqual(await token0.balanceOf(pool.address), token0Amount.add(swapAmount));
+        Helper.assertEqual(await token1.balanceOf(pool.address), token1Amount.sub(amountOut));
+        // balance of token0 should be unchanged after transfer
+        Helper.assertEqual(await token0.balanceOf(trader), beforeBalanceToken0);
+        // balance of token1 should increase by amountOut
+        Helper.assertEqual(await token1.balanceOf(trader), beforeBalanceToken1.add(amountOut));
+        // this number of uniswap is 73462
+        console.log(`unamplified pool swap gasUsed = ${txResult.receipt.gasUsed}`);
       });
 
-      expectEvent(txResult, 'Swap', {
-        sender: app,
-        amount0In: swapAmount,
-        amount1In: new BN(0),
-        amount0Out: new BN(0),
-        amount1Out: amountOut,
-        to: trader
+      it('cannot swap when pool is paused', async () => {
+        [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps);
+        const token0Amount = expandTo18Decimals(5);
+        const token1Amount = expandTo18Decimals(10);
+        const swapAmount = expandTo18Decimals(1);
+
+        await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
+
+        let amountOut = await buniHelper.getAmountOut(swapAmount, token0.address, pool);
+        // when amountIn = 0 -> revert
+        await expectRevert(pool.swap(new BN(0), amountOut, trader, '0x', {from: app}), 'BUNI: INSUFFICIENT_INPUT_AMOUNT');
+
+        // when amountOut = 0 -> revert
+        await token0.transfer(pool.address, swapAmount);
+        await expectRevert(
+          pool.swap(new BN(0), new BN(0), trader, '0x', {from: app}),
+          'BUNI: INSUFFICIENT_OUTPUT_AMOUNT'
+        );
+        // when amountOut > liquidity -> revert
+        await expectRevert(
+          pool.swap(new BN(0), token1Amount.add(new BN(1)), trader, '0x', {from: app}),
+          'BUNI: INSUFFICIENT_LIQUIDITY'
+        );
+        // revert when destAddres is token0 or token1
+        await expectRevert(pool.swap(new BN(0), amountOut, token0.address, '0x', {from: app}), 'BUNI: INVALID_TO');
+        // normal swap if everything is valid
+        await token1.transfer(trader, new BN(1));
+        // call pause method from author
+        await pool.pause({ from: accounts[0] });
+        // should revert
+        await expectRevert(pool.swap(new BN(0), amountOut, trader, '0x', {from: app}), 'Pausable: paused');
       });
-
-      Helper.assertEqual(await token0.balanceOf(pool.address), token0Amount.add(swapAmount));
-      Helper.assertEqual(await token1.balanceOf(pool.address), token1Amount.sub(amountOut));
-      // balance of token0 should be unchanged after transfer
-      Helper.assertEqual(await token0.balanceOf(trader), beforeBalanceToken0);
-      // balance of token1 should increase by amountOut
-      Helper.assertEqual(await token1.balanceOf(trader), beforeBalanceToken1.add(amountOut));
-      // this number of uniswap is 73462
-      console.log(`amp pool swap gasUsed = ${txResult.receipt.gasUsed}`);
-    });
-
-    it('swap:token0 unamplified pool', async () => {
-      [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps);
-      const token0Amount = expandTo18Decimals(5);
-      const token1Amount = expandTo18Decimals(10);
-      const swapAmount = expandTo18Decimals(1);
-
-      await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
-
-      let amountOut = await buniHelper.getAmountOut(swapAmount, token0.address, pool);
-      // when amountIn = 0 -> revert
-      await expectRevert(pool.swap(new BN(0), amountOut, trader, '0x', {from: app}), 'BUNI: INSUFFICIENT_INPUT_AMOUNT');
-
-      // when amountOut = 0 -> revert
-      await token0.transfer(pool.address, swapAmount);
-      await expectRevert(
-        pool.swap(new BN(0), new BN(0), trader, '0x', {from: app}),
-        'BUNI: INSUFFICIENT_OUTPUT_AMOUNT'
-      );
-      // when amountOut > liquidity -> revert
-      await expectRevert(
-        pool.swap(new BN(0), token1Amount.add(new BN(1)), trader, '0x', {from: app}),
-        'BUNI: INSUFFICIENT_LIQUIDITY'
-      );
-      // revert when destAddres is token0 or token1
-      await expectRevert(pool.swap(new BN(0), amountOut, token0.address, '0x', {from: app}), 'BUNI: INVALID_TO');
-      // normal swap if everything is valid
-      await token1.transfer(trader, new BN(1));
-
-      let beforeBalanceToken0 = await token0.balanceOf(trader);
-      let beforeBalanceToken1 = await token1.balanceOf(trader);
-      let txResult = await pool.swap(new BN(0), amountOut, trader, '0x', {from: app});
-
-      expectEvent(txResult, 'Sync', {
-        reserve0: token0Amount.add(swapAmount),
-        reserve1: token1Amount.sub(amountOut),
-        vReserve0: new BN(0),
-        vReserve1: new BN(0)
-      });
-
-      expectEvent(txResult, 'Swap', {
-        sender: app,
-        amount0In: swapAmount,
-        amount1In: new BN(0),
-        amount0Out: new BN(0),
-        amount1Out: amountOut,
-        to: trader
-      });
-
-      const tradeInfo = await pool.getTradeInfo();
-      Helper.assertEqual(await token0.balanceOf(pool.address), token0Amount.add(swapAmount));
-      Helper.assertEqual(await token1.balanceOf(pool.address), token1Amount.sub(amountOut));
-      // balance of token0 should be unchanged after transfer
-      Helper.assertEqual(await token0.balanceOf(trader), beforeBalanceToken0);
-      // balance of token1 should increase by amountOut
-      Helper.assertEqual(await token1.balanceOf(trader), beforeBalanceToken1.add(amountOut));
-      // this number of uniswap is 73462
-      console.log(`unamplified pool swap gasUsed = ${txResult.receipt.gasUsed}`);
     });
 
     [20000, 50000, 200000, 1000000].forEach(ampBPS => {
+      describe(`swap: token0 stable pool ampBPS = ${ampBPS}`, () => {
+        it('can swap when pool is not pause', async () => {
+          [factory, pool] = await setupPool(admin, token0, token1, new BN(ampBPS));
+          const token0Amount = expandTo18Decimals(10);
+          const token1Amount = expandTo18Decimals(10);
+          const swapAmount = expandTo18Decimals(1);
+
+          await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
+          let tradeInfo = await pool.getTradeInfo();
+          console.log(`fee = ${tradeInfo.feeInPrecision.toString()}`);
+
+          let amountOut = await buniHelper.getAmountOut(swapAmount, token0, pool);
+
+          let beforeBalanceToken0 = await token0.balanceOf(trader);
+          let beforeBalanceToken1 = await token1.balanceOf(trader);
+          await token0.transfer(pool.address, swapAmount);
+
+          await expectRevert(pool.swap(new BN(0), amountOut.add(new BN(1)), trader, '0x', {from: app}), 'BUNI: K');
+
+          let result = await pool.swap(new BN(0), amountOut, trader, '0x', {from: app});
+          console.log(`stable pool gasUsed = ${result.receipt.gasUsed}`);
+
+          await assertTokenPoolBalances(token0, token1, pool.address, [
+            token0Amount.add(swapAmount),
+            token1Amount.sub(amountOut)
+          ]);
+
+          await assertTokenPoolBalances(token0, token1, trader, [
+            beforeBalanceToken0,
+            beforeBalanceToken1.add(amountOut)
+          ]);
+        });
+
+        it('cannot swap when pool is paused', async () => {
+          [factory, pool] = await setupPool(admin, token0, token1, new BN(ampBPS));
+          const token0Amount = expandTo18Decimals(10);
+          const token1Amount = expandTo18Decimals(10);
+          const swapAmount = expandTo18Decimals(1);
+
+          await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
+          let tradeInfo = await pool.getTradeInfo();
+          console.log(`fee = ${tradeInfo.feeInPrecision.toString()}`);
+
+          let amountOut = await buniHelper.getAmountOut(swapAmount, token0, pool);
+
+          let beforeBalanceToken0 = await token0.balanceOf(trader);
+          let beforeBalanceToken1 = await token1.balanceOf(trader);
+          await token0.transfer(pool.address, swapAmount);
+
+          await expectRevert(pool.swap(new BN(0), amountOut.add(new BN(1)), trader, '0x', {from: app}), 'BUNI: K');
+
+          let result = await pool.swap(new BN(0), amountOut, trader, '0x', {from: app});
+          console.log(`stable pool gasUsed = ${result.receipt.gasUsed}`);
+
+          await assertTokenPoolBalances(token0, token1, pool.address, [
+            token0Amount.add(swapAmount),
+            token1Amount.sub(amountOut)
+          ]);
+
+          await assertTokenPoolBalances(token0, token1, trader, [
+            beforeBalanceToken0,
+            beforeBalanceToken1.add(amountOut)
+          ]);
+        });
+      });
       it(`swap: token0 stable pool ampBPS = ${ampBPS}`, async () => {
         [factory, pool] = await setupPool(admin, token0, token1, new BN(ampBPS));
         const token0Amount = expandTo18Decimals(10);
@@ -329,131 +503,181 @@ contract('BuniCornPool', function (accounts) {
 
         let amountOut = await buniHelper.getAmountOut(swapAmount, token0, pool);
 
-        let beforeBalanceToken0 = await token0.balanceOf(trader);
-        let beforeBalanceToken1 = await token1.balanceOf(trader);
         await token0.transfer(pool.address, swapAmount);
 
         await expectRevert(pool.swap(new BN(0), amountOut.add(new BN(1)), trader, '0x', {from: app}), 'BUNI: K');
 
-        let result = await pool.swap(new BN(0), amountOut, trader, '0x', {from: app});
-        console.log(`stable pool gasUsed = ${result.receipt.gasUsed}`);
-
-        await assertTokenPoolBalances(token0, token1, pool.address, [
-          token0Amount.add(swapAmount),
-          token1Amount.sub(amountOut)
-        ]);
-
-        await assertTokenPoolBalances(token0, token1, trader, [
-          beforeBalanceToken0,
-          beforeBalanceToken1.add(amountOut)
-        ]);
+        // call pause method from author
+        await pool.pause({ from: accounts[0] });
+        // should revert
+        await expectRevert(pool.swap(new BN(0), amountOut, trader, '0x', {from: app}), 'Pausable: paused');
       });
 
-      it(`swap: token1 stable pool ampBPS = ${ampBPS}`, async () => {
-        [factory, pool] = await setupPool(admin, token0, token1, new BN(ampBPS));
-        const token0Amount = expandTo18Decimals(10);
-        const token1Amount = expandTo18Decimals(10);
-        const swapAmount = expandTo18Decimals(1);
+      describe(`swap: token1 stable pool ampBPS = ${ampBPS}`, () => {
+        it('can swap when pool is not pause', async () => {
+          [factory, pool] = await setupPool(admin, token0, token1, new BN(ampBPS));
+          const token0Amount = expandTo18Decimals(10);
+          const token1Amount = expandTo18Decimals(10);
+          const swapAmount = expandTo18Decimals(1);
 
+          await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
+
+          let tradeInfo = await pool.getTradeInfo();
+          console.log(`fee = ${tradeInfo.feeInPrecision.toString()}`);
+          let amountOut = await buniHelper.getAmountOut(swapAmount, token1, pool);
+
+          let beforeBalanceToken0 = await token0.balanceOf(trader);
+          let beforeBalanceToken1 = await token1.balanceOf(trader);
+          await token1.transfer(pool.address, swapAmount);
+
+          await expectRevert(pool.swap(amountOut.add(new BN(1)), new BN(0), trader, '0x', {from: app}), 'BUNI: K');
+
+          let result = await pool.swap(amountOut, new BN(0), trader, '0x', {from: app});
+          console.log(`stable pool gasUsed = ${result.receipt.gasUsed}`);
+
+          await assertTokenPoolBalances(token0, token1, pool.address, [
+            token0Amount.sub(amountOut),
+            token1Amount.add(swapAmount)
+          ]);
+
+          await assertTokenPoolBalances(token0, token1, trader, [
+            beforeBalanceToken0.add(amountOut),
+            beforeBalanceToken1
+          ]);
+        });
+
+        it('cannot swap when pool is paused', async () => {
+          [factory, pool] = await setupPool(admin, token0, token1, new BN(ampBPS));
+          const token0Amount = expandTo18Decimals(10);
+          const token1Amount = expandTo18Decimals(10);
+          const swapAmount = expandTo18Decimals(1);
+
+          await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
+
+          let tradeInfo = await pool.getTradeInfo();
+          console.log(`fee = ${tradeInfo.feeInPrecision.toString()}`);
+          let amountOut = await buniHelper.getAmountOut(swapAmount, token1, pool);
+
+          await token1.transfer(pool.address, swapAmount);
+
+          await expectRevert(pool.swap(amountOut.add(new BN(1)), new BN(0), trader, '0x', {from: app}), 'BUNI: K');
+
+          // call pause method from author
+          await pool.pause({ from: accounts[0] });
+          // should revert
+          await expectRevert(pool.swap(amountOut, new BN(0), trader, '0x', {from: app}), 'Pausable: paused');
+        });
+      });
+    });
+
+    describe('swap:token1 amp pool', () => {
+      it('can swap when pool is not pause', async () => {
+        [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+        const token0Amount = expandTo18Decimals(5);
+        const token1Amount = expandTo18Decimals(10);
         await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
 
-        let tradeInfo = await pool.getTradeInfo();
-        console.log(`fee = ${tradeInfo.feeInPrecision.toString()}`);
+        const swapAmount = expandTo18Decimals(1);
         let amountOut = await buniHelper.getAmountOut(swapAmount, token1, pool);
+        await token1.transfer(pool.address, swapAmount);
 
         let beforeBalanceToken0 = await token0.balanceOf(trader);
         let beforeBalanceToken1 = await token1.balanceOf(trader);
+        let result = await pool.swap(amountOut, new BN(0), trader, '0x', {from: app});
+
+        expectEvent(result, 'Sync', {
+          reserve0: token0Amount.sub(amountOut),
+          reserve1: token1Amount.add(swapAmount)
+        });
+
+        expectEvent(result, 'Swap', {
+          sender: app,
+          amount0In: new BN(0),
+          amount1In: swapAmount,
+          amount0Out: amountOut,
+          amount1Out: new BN(0),
+          to: trader
+        });
+
+        Helper.assertEqual(await token0.balanceOf(pool.address), token0Amount.sub(amountOut));
+        Helper.assertEqual(await token1.balanceOf(pool.address), token1Amount.add(swapAmount));
+        // balance of token0 should increase by amountOut
+        Helper.assertEqual(await token0.balanceOf(trader), beforeBalanceToken0.add(amountOut));
+        // balance of token1 should be unchanged after transfer
+        Helper.assertEqual(await token1.balanceOf(trader), beforeBalanceToken1);
+      });
+
+      it('cannot swap when pool is paused', async () => {
+        [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+        const token0Amount = expandTo18Decimals(5);
+        const token1Amount = expandTo18Decimals(10);
+        await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
+
+        const swapAmount = expandTo18Decimals(1);
+        let amountOut = await buniHelper.getAmountOut(swapAmount, token1, pool);
         await token1.transfer(pool.address, swapAmount);
 
-        await expectRevert(pool.swap(amountOut.add(new BN(1)), new BN(0), trader, '0x', {from: app}), 'BUNI: K');
+        // call pause method from author
+        await pool.pause({ from: accounts[0] });
+        // should revert
+        await expectRevert(pool.swap(amountOut, new BN(0), trader, '0x', {from: app}), 'Pausable: paused');
+      });
+    });
 
+    describe('swap:token1 unamplified pool', () => {
+      it('can swap when pool is not pause', async () => {
+        [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps, new BN(0));
+        const token0Amount = expandTo18Decimals(5);
+        const token1Amount = expandTo18Decimals(10);
+        await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
+
+        const swapAmount = expandTo18Decimals(1);
+        let amountOut = await buniHelper.getAmountOut(swapAmount, token1, pool);
+        await token1.transfer(pool.address, swapAmount);
+
+        let beforeBalanceToken0 = await token0.balanceOf(trader);
+        let beforeBalanceToken1 = await token1.balanceOf(trader);
         let result = await pool.swap(amountOut, new BN(0), trader, '0x', {from: app});
-        console.log(`stable pool gasUsed = ${result.receipt.gasUsed}`);
 
-        await assertTokenPoolBalances(token0, token1, pool.address, [
-          token0Amount.sub(amountOut),
-          token1Amount.add(swapAmount)
-        ]);
+        expectEvent(result, 'Sync', {
+          reserve0: token0Amount.sub(amountOut),
+          reserve1: token1Amount.add(swapAmount),
+          vReserve0: new BN(0),
+          vReserve1: new BN(0)
+        });
 
-        await assertTokenPoolBalances(token0, token1, trader, [
-          beforeBalanceToken0.add(amountOut),
-          beforeBalanceToken1
-        ]);
-      });
-    });
+        expectEvent(result, 'Swap', {
+          sender: app,
+          amount0In: new BN(0),
+          amount1In: swapAmount,
+          amount0Out: amountOut,
+          amount1Out: new BN(0),
+          to: trader
+        });
 
-    it('swap:token1 amp pool', async () => {
-      [factory, pool] = await setupPool(admin, token0, token1, ampBps);
-      const token0Amount = expandTo18Decimals(5);
-      const token1Amount = expandTo18Decimals(10);
-      await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
-
-      const swapAmount = expandTo18Decimals(1);
-      let amountOut = await buniHelper.getAmountOut(swapAmount, token1, pool);
-      await token1.transfer(pool.address, swapAmount);
-
-      let beforeBalanceToken0 = await token0.balanceOf(trader);
-      let beforeBalanceToken1 = await token1.balanceOf(trader);
-      let result = await pool.swap(amountOut, new BN(0), trader, '0x', {from: app});
-
-      expectEvent(result, 'Sync', {
-        reserve0: token0Amount.sub(amountOut),
-        reserve1: token1Amount.add(swapAmount)
+        Helper.assertEqual(await token0.balanceOf(pool.address), token0Amount.sub(amountOut));
+        Helper.assertEqual(await token1.balanceOf(pool.address), token1Amount.add(swapAmount));
+        // balance of token0 should increase by amountOut
+        Helper.assertEqual(await token0.balanceOf(trader), beforeBalanceToken0.add(amountOut));
+        // balance of token1 should be unchanged after transfer
+        Helper.assertEqual(await token1.balanceOf(trader), beforeBalanceToken1);
       });
 
-      expectEvent(result, 'Swap', {
-        sender: app,
-        amount0In: new BN(0),
-        amount1In: swapAmount,
-        amount0Out: amountOut,
-        amount1Out: new BN(0),
-        to: trader
+      it('cannot swap when pool is paused', async () => {
+        [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps, new BN(0));
+        const token0Amount = expandTo18Decimals(5);
+        const token1Amount = expandTo18Decimals(10);
+        await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
+
+        const swapAmount = expandTo18Decimals(1);
+        let amountOut = await buniHelper.getAmountOut(swapAmount, token1, pool);
+        await token1.transfer(pool.address, swapAmount);
+
+        // call pause method from author
+        await pool.pause({ from: accounts[0] });
+        // should revert
+        await expectRevert(pool.swap(amountOut, new BN(0), trader, '0x', {from: app}), 'Pausable: paused');
       });
-
-      Helper.assertEqual(await token0.balanceOf(pool.address), token0Amount.sub(amountOut));
-      Helper.assertEqual(await token1.balanceOf(pool.address), token1Amount.add(swapAmount));
-      // balance of token0 should increase by amountOut
-      Helper.assertEqual(await token0.balanceOf(trader), beforeBalanceToken0.add(amountOut));
-      // balance of token1 should be unchanged after transfer
-      Helper.assertEqual(await token1.balanceOf(trader), beforeBalanceToken1);
-    });
-
-    it('swap:token1 unamplified pool', async () => {
-      [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps, new BN(0));
-      const token0Amount = expandTo18Decimals(5);
-      const token1Amount = expandTo18Decimals(10);
-      await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
-
-      const swapAmount = expandTo18Decimals(1);
-      let amountOut = await buniHelper.getAmountOut(swapAmount, token1, pool);
-      await token1.transfer(pool.address, swapAmount);
-
-      let beforeBalanceToken0 = await token0.balanceOf(trader);
-      let beforeBalanceToken1 = await token1.balanceOf(trader);
-      let result = await pool.swap(amountOut, new BN(0), trader, '0x', {from: app});
-
-      expectEvent(result, 'Sync', {
-        reserve0: token0Amount.sub(amountOut),
-        reserve1: token1Amount.add(swapAmount),
-        vReserve0: new BN(0),
-        vReserve1: new BN(0)
-      });
-
-      expectEvent(result, 'Swap', {
-        sender: app,
-        amount0In: new BN(0),
-        amount1In: swapAmount,
-        amount0Out: amountOut,
-        amount1Out: new BN(0),
-        to: trader
-      });
-
-      Helper.assertEqual(await token0.balanceOf(pool.address), token0Amount.sub(amountOut));
-      Helper.assertEqual(await token1.balanceOf(pool.address), token1Amount.add(swapAmount));
-      // balance of token0 should increase by amountOut
-      Helper.assertEqual(await token0.balanceOf(trader), beforeBalanceToken0.add(amountOut));
-      // balance of token1 should be unchanged after transfer
-      Helper.assertEqual(await token1.balanceOf(trader), beforeBalanceToken1);
     });
 
     const optimisticTestCases = [
@@ -463,107 +687,172 @@ contract('BuniCornPool', function (accounts) {
       [expandTo18Decimals(1), expandTo18Decimals(5), expandTo18Decimals(5), new BN('1003009027081243732')] // given amountOut, amountIn = ceiling(amountOut / .997)
     ];
     optimisticTestCases.forEach((testCase, i) => {
-      it(`optimistic:${i}`, async () => {
-        const [, token0Amount, token1Amount, inputAmount] = testCase;
-        await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
-        await token0.transfer(pool.address, inputAmount);
+      describe(`optimistic:${i}`, () => {
+        beforeEach('check pool', async () => {
+          const paused = await pool.paused();
+          if (!!paused) {
+            await pool.unpause({ from: accounts[0] });
+          }
+        });
 
-        let result = await pool.getTradeInfo();
+        it('can swap when pool is not pause', async () => {
+          const [, token0Amount, token1Amount, inputAmount] = testCase;
+          await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
+          await token0.transfer(pool.address, inputAmount);
 
-        let outputAmount = inputAmount.mul(precisionUnits.sub(result.feeInPrecision)).div(precisionUnits);
-        await expectRevert(pool.swap(outputAmount.add(new BN(1)), 0, trader, '0x'), 'BUNI: K');
-        await pool.swap(outputAmount, 0, trader, '0x');
+          let result = await pool.getTradeInfo();
+
+          let outputAmount = inputAmount.mul(precisionUnits.sub(result.feeInPrecision)).div(precisionUnits);
+          await expectRevert(pool.swap(outputAmount.add(new BN(1)), 0, trader, '0x'), 'BUNI: K');
+          await pool.swap(outputAmount, 0, trader, '0x');
+        });
+
+        it('cannot swap when pool is paused', async () => {
+          const [, token0Amount, token1Amount, inputAmount] = testCase;
+          await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
+          await token0.transfer(pool.address, inputAmount);
+
+          let result = await pool.getTradeInfo();
+
+          let outputAmount = inputAmount.mul(precisionUnits.sub(result.feeInPrecision)).div(precisionUnits);
+          await expectRevert(pool.swap(outputAmount.add(new BN(1)), 0, trader, '0x'), 'BUNI: K');
+          // call pause method from author
+          await pool.pause({ from: accounts[0] });
+          // should revert
+          await expectRevert(pool.swap(outputAmount, 0, trader, '0x'), 'Pausable: paused');
+        });
       });
     });
   });
 
   describe('burn', async () => {
-    it('burn unamplified pool', async () => {
-      [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps);
-      const token0Amount = expandTo18Decimals(3);
-      const token1Amount = expandTo18Decimals(3);
-      await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
-
-      // revert if liquidity burn is 0
-      await expectRevert(pool.burn(liquidityProvider, {from: app}), 'BUNI: INSUFFICIENT_LIQUIDITY_BURNED');
-
-      const expectedLiquidity = expandTo18Decimals(3);
-      let beforeBalances = await getTokenPoolBalances(token0, token1, liquidityProvider);
-
-      await pool.transfer(pool.address, expectedLiquidity.sub(MINIMUM_LIQUIDITY), {from: liquidityProvider});
-      let result = await pool.burn(liquidityProvider, {from: app});
-
-      expectEvent(result, 'Transfer', {
-        from: pool.address,
-        to: constants.ZERO_ADDRESS,
-        value: expectedLiquidity.sub(MINIMUM_LIQUIDITY)
+    describe('unamplified pool', () => {
+      it('can burn when pool is not pause', async () => {
+        [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps);
+        const token0Amount = expandTo18Decimals(3);
+        const token1Amount = expandTo18Decimals(3);
+        await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
+  
+        // revert if liquidity burn is 0
+        await expectRevert(pool.burn(liquidityProvider, {from: app}), 'BUNI: INSUFFICIENT_LIQUIDITY_BURNED');
+  
+        const expectedLiquidity = expandTo18Decimals(3);
+        let beforeBalances = await getTokenPoolBalances(token0, token1, liquidityProvider);
+  
+        await pool.transfer(pool.address, expectedLiquidity.sub(MINIMUM_LIQUIDITY), {from: liquidityProvider});
+        let result = await pool.burn(liquidityProvider, {from: app});
+  
+        expectEvent(result, 'Transfer', {
+          from: pool.address,
+          to: constants.ZERO_ADDRESS,
+          value: expectedLiquidity.sub(MINIMUM_LIQUIDITY)
+        });
+  
+        expectEvent(result, 'Burn', {
+          sender: app,
+          amount0: token0Amount.sub(new BN(1000)),
+          amount1: token1Amount.sub(new BN(1000))
+        });
+  
+        expectEvent(result, 'Sync', {
+          reserve0: new BN(1000),
+          reserve1: new BN(1000)
+        });
+  
+        Helper.assertEqual(await pool.balanceOf(liquidityProvider), new BN(0));
+        Helper.assertEqual(await pool.totalSupply(), MINIMUM_LIQUIDITY);
+        // assert balances of user and pool
+        await assertTokenPoolBalances(token0, token1, pool.address, [MINIMUM_LIQUIDITY, MINIMUM_LIQUIDITY]);
+        await assertTokenPoolBalances(token0, token1, liquidityProvider, [
+          beforeBalances[0].add(token0Amount.sub(MINIMUM_LIQUIDITY)),
+          beforeBalances[1].add(token1Amount.sub(MINIMUM_LIQUIDITY))
+        ]);
+        console.log(`burn gas used ${result.receipt.gasUsed}`);
       });
 
-      expectEvent(result, 'Burn', {
-        sender: app,
-        amount0: token0Amount.sub(new BN(1000)),
-        amount1: token1Amount.sub(new BN(1000))
+      it('cannot burn when pool is paused', async () => {
+        [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps);
+        const token0Amount = expandTo18Decimals(3);
+        const token1Amount = expandTo18Decimals(3);
+        await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
+  
+        // revert if liquidity burn is 0
+        await expectRevert(pool.burn(liquidityProvider, {from: app}), 'BUNI: INSUFFICIENT_LIQUIDITY_BURNED');
+  
+        const expectedLiquidity = expandTo18Decimals(3);
+  
+        await pool.transfer(pool.address, expectedLiquidity.sub(MINIMUM_LIQUIDITY), {from: liquidityProvider});
+        // call pause method from author
+        await pool.pause({ from: accounts[0] });
+        // should revert
+        await expectRevert(pool.burn(liquidityProvider, {from: app}), 'Pausable: paused');
       });
-
-      expectEvent(result, 'Sync', {
-        reserve0: new BN(1000),
-        reserve1: new BN(1000)
-      });
-
-      Helper.assertEqual(await pool.balanceOf(liquidityProvider), new BN(0));
-      Helper.assertEqual(await pool.totalSupply(), MINIMUM_LIQUIDITY);
-      // assert balances of user and pool
-      await assertTokenPoolBalances(token0, token1, pool.address, [MINIMUM_LIQUIDITY, MINIMUM_LIQUIDITY]);
-      await assertTokenPoolBalances(token0, token1, liquidityProvider, [
-        beforeBalances[0].add(token0Amount.sub(MINIMUM_LIQUIDITY)),
-        beforeBalances[1].add(token1Amount.sub(MINIMUM_LIQUIDITY))
-      ]);
-      console.log(`burn gas used ${result.receipt.gasUsed}`);
     });
 
-    it('burn amp pool', async () => {
-      [factory, pool] = await setupPool(admin, token0, token1, ampBps);
-      const token0Amount = expandTo18Decimals(1);
-      const token1Amount = expandTo18Decimals(4);
-      await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
-
-      // revert if liquidity burn is 0
-      await expectRevert(pool.burn(liquidityProvider, {from: app}), 'BUNI: INSUFFICIENT_LIQUIDITY_BURNED');
-
-      const expectedLiquidity = expandTo18Decimals(2);
-      let beforeBalances = await getTokenPoolBalances(token0, token1, liquidityProvider);
-
-      await pool.transfer(pool.address, expectedLiquidity.sub(MINIMUM_LIQUIDITY), {from: liquidityProvider});
-      let result = await pool.burn(liquidityProvider, {from: app});
-
-      expectEvent(result, 'Transfer', {
-        from: pool.address,
-        to: constants.ZERO_ADDRESS,
-        value: expectedLiquidity.sub(MINIMUM_LIQUIDITY)
+    describe('amp pool', () => {
+      it('can burn when pool is not pause', async () => {
+        [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+        const token0Amount = expandTo18Decimals(1);
+        const token1Amount = expandTo18Decimals(4);
+        await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
+  
+        // revert if liquidity burn is 0
+        await expectRevert(pool.burn(liquidityProvider, {from: app}), 'BUNI: INSUFFICIENT_LIQUIDITY_BURNED');
+  
+        const expectedLiquidity = expandTo18Decimals(2);
+        let beforeBalances = await getTokenPoolBalances(token0, token1, liquidityProvider);
+  
+        await pool.transfer(pool.address, expectedLiquidity.sub(MINIMUM_LIQUIDITY), {from: liquidityProvider});
+        let result = await pool.burn(liquidityProvider, {from: app});
+  
+        expectEvent(result, 'Transfer', {
+          from: pool.address,
+          to: constants.ZERO_ADDRESS,
+          value: expectedLiquidity.sub(MINIMUM_LIQUIDITY)
+        });
+  
+        expectEvent(result, 'Burn', {
+          sender: app,
+          amount0: token0Amount.sub(new BN(500)),
+          amount1: token1Amount.sub(new BN(2000))
+        });
+  
+        expectEvent(result, 'Sync', {
+          reserve0: new BN(500),
+          reserve1: new BN(2000),
+          vReserve0: new BN(500).mul(ampBps).div(Helper.BPS),
+          vReserve1: new BN(2000).mul(ampBps).div(Helper.BPS)
+        });
+  
+        Helper.assertEqual(await pool.balanceOf(liquidityProvider), new BN(0));
+        Helper.assertEqual(await pool.totalSupply(), MINIMUM_LIQUIDITY);
+        // assert balances of user and pool
+        await assertTokenPoolBalances(token0, token1, pool.address, [new BN(500), new BN(2000)]);
+        await assertTokenPoolBalances(token0, token1, liquidityProvider, [
+          beforeBalances[0].add(token0Amount.sub(new BN(500))),
+          beforeBalances[1].add(token1Amount.sub(new BN(2000)))
+        ]);
+        console.log(`burn gas used ${result.receipt.gasUsed}`);
       });
 
-      expectEvent(result, 'Burn', {
-        sender: app,
-        amount0: token0Amount.sub(new BN(500)),
-        amount1: token1Amount.sub(new BN(2000))
+      it('cannot burn when pool is paused', async () => {
+        [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+        const token0Amount = expandTo18Decimals(1);
+        const token1Amount = expandTo18Decimals(4);
+        await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
+  
+        // revert if liquidity burn is 0
+        await expectRevert(pool.burn(liquidityProvider, {from: app}), 'BUNI: INSUFFICIENT_LIQUIDITY_BURNED');
+  
+        const expectedLiquidity = expandTo18Decimals(2);
+        let beforeBalances = await getTokenPoolBalances(token0, token1, liquidityProvider);
+  
+        await pool.transfer(pool.address, expectedLiquidity.sub(MINIMUM_LIQUIDITY), {from: liquidityProvider});
+         // call pause method from author
+         await pool.pause({ from: accounts[0] });
+         // should revert
+         await expectRevert(pool.burn(liquidityProvider, {from: app}), 'Pausable: paused');
       });
-
-      expectEvent(result, 'Sync', {
-        reserve0: new BN(500),
-        reserve1: new BN(2000),
-        vReserve0: new BN(500).mul(ampBps).div(Helper.BPS),
-        vReserve1: new BN(2000).mul(ampBps).div(Helper.BPS)
-      });
-
-      Helper.assertEqual(await pool.balanceOf(liquidityProvider), new BN(0));
-      Helper.assertEqual(await pool.totalSupply(), MINIMUM_LIQUIDITY);
-      // assert balances of user and pool
-      await assertTokenPoolBalances(token0, token1, pool.address, [new BN(500), new BN(2000)]);
-      await assertTokenPoolBalances(token0, token1, liquidityProvider, [
-        beforeBalances[0].add(token0Amount.sub(new BN(500))),
-        beforeBalances[1].add(token1Amount.sub(new BN(2000)))
-      ]);
-      console.log(`burn gas used ${result.receipt.gasUsed}`);
     });
   });
 
@@ -768,6 +1057,43 @@ contract('BuniCornPool', function (accounts) {
     await token0.transfer(pool.address, new BN(2).pow(new BN(112)));
     await expectRevert(pool.sync(), 'BUNI: OVERFLOW');
     await pool.skim(trader);
+  });
+
+  describe('pause', () => {
+    it('can pause when caller is author', async () => {
+      [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+      const result = await pool.pause({ from: accounts[0] });
+      expectEvent(result, 'Paused', {
+        account: accounts[0]
+      });
+    });
+
+    it('cannot pause when caller is not author', async () => {
+      [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+      // should revert
+      await expectRevert(pool.pause({ from: accounts[1] }), 'BUNI: caller is not the author');
+    });
+  });
+
+  describe('unpause', () => {
+    it('can unpause when caller is author', async () => {
+      [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+      // author pause first
+      await pool.pause({ from: accounts[0] });
+      // author unpause then
+      const result = await pool.unpause({ from: accounts[0] });
+      expectEvent(result, 'Unpaused', {
+        account: accounts[0]
+      });
+    });
+
+    it('cannot pause when caller is not author', async () => {
+      [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+      // author pause first
+      await pool.pause({ from: accounts[0] });
+      // should revert
+      await expectRevert(pool.unpause({ from: accounts[1] }), 'BUNI: caller is not the author');
+    });
   });
 });
 
