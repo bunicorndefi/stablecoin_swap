@@ -19,6 +19,9 @@ contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
     using SafeMath for uint256;
 
     uint256 internal constant BPS = 10000;
+    uint256 internal constant MIN_VRESERVE_RATIO = 0;
+    uint256 internal constant MAX_VRESERVE_RATIO = 2**256 - 1;
+    uint256 internal constant Q112 = 2**112;
 
     address public immutable override factory;
     IWBNB public immutable override wbnb;
@@ -45,9 +48,11 @@ contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
         uint256 amountADesired,
         uint256 amountBDesired,
         uint256 amountAMin,
-        uint256 amountBMin
+        uint256 amountBMin,
+        uint256[2] memory vReserveRatioBounds
     ) internal virtual view returns (uint256 amountA, uint256 amountB) {
-        (uint256 reserveA, uint256 reserveB) = BuniCornLibrary.getReserves(pool, tokenA, tokenB);
+        (uint256 reserveA, uint256 reserveB, uint256 vReserveA, uint256 vReserveB, ) = BuniCornLibrary
+            .getTradeInfo(pool, tokenA, tokenB);
         if (reserveA == 0 && reserveB == 0) {
             (amountA, amountB) = (amountADesired, amountBDesired);
         } else {
@@ -61,6 +66,11 @@ contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
                 require(amountAOptimal >= amountAMin, "BUNIROUTER: INSUFFICIENT_A_AMOUNT");
                 (amountA, amountB) = (amountAOptimal, amountBDesired);
             }
+            uint256 currentRate = (vReserveB * Q112) / vReserveA;
+            require(
+                currentRate >= vReserveRatioBounds[0] && currentRate <= vReserveRatioBounds[1],
+                "BUNIROUTER: OUT_OF_BOUNDS_VRESERVE"
+            );
         }
     }
 
@@ -72,6 +82,7 @@ contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
         uint256 amountBDesired,
         uint256 amountAMin,
         uint256 amountBMin,
+        uint256[2] memory vReserveRatioBounds,
         address to,
         uint256 deadline
     )
@@ -93,7 +104,8 @@ contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
             amountADesired,
             amountBDesired,
             amountAMin,
-            amountBMin
+            amountBMin,
+            vReserveRatioBounds
         );
         // using tokenA.safeTransferFrom will get "Stack too deep"
         SafeERC20.safeTransferFrom(tokenA, msg.sender, pool, amountA);
@@ -107,6 +119,7 @@ contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
         uint256 amountTokenDesired,
         uint256 amountTokenMin,
         uint256 amountBNBMin,
+        uint256[2] memory vReserveRatioBounds,
         address to,
         uint256 deadline
     )
@@ -128,7 +141,8 @@ contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
             amountTokenDesired,
             msg.value,
             amountTokenMin,
-            amountBNBMin
+            amountBNBMin,
+            vReserveRatioBounds
         );
         token.safeTransferFrom(msg.sender, pool, amountToken);
         wbnb.deposit{value: amountBNB}();
@@ -168,6 +182,9 @@ contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
         if (pool == address(0)) {
             pool = IBuniCornFactory(factory).createPool(tokenA, tokenB, ampBps);
         }
+        // if we add liquidity to an existing pool, this is an unamplifed pool
+        // so there is no need for bounds of virtual reserve ratio
+        uint256[2] memory vReserveRatioBounds = [MIN_VRESERVE_RATIO, MAX_VRESERVE_RATIO];
         (amountA, amountB, liquidity) = addLiquidity(
             tokenA,
             tokenB,
@@ -176,6 +193,7 @@ contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
             amountBDesired,
             amountAMin,
             amountBMin,
+            vReserveRatioBounds,
             to,
             deadline
         );
@@ -208,12 +226,16 @@ contract BuniCornRouter02 is Ownable, IBuniCornRouter02 {
         if (pool == address(0)) {
             pool = IBuniCornFactory(factory).createPool(token, wbnb, ampBps);
         }
+        // if we add liquidity to an existing pool, this is an unamplifed pool
+        // so there is no need for bounds of virtual reserve ratio
+        uint256[2] memory vReserveRatioBounds = [MIN_VRESERVE_RATIO, MAX_VRESERVE_RATIO];
         (amountToken, amountBNB, liquidity) = addLiquidityBNB(
             token,
             pool,
             amountTokenDesired,
-            amountTokenMin,
             amountBNBMin,
+            amountBNB,
+            vReserveRatioBounds,
             to,
             deadline
         );

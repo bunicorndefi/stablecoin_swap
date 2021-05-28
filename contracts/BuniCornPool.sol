@@ -23,7 +23,7 @@ contract BuniCornPool is IBuniCornPool, ERC20Permit, ReentrancyGuard, VolumeTren
 
     // handling mechanism to protect the pool
     // the author can stop the swap and burn method when the pool is at risk
-    address public author = 0xc783df8a850f42e7F7e57013759C285caa701eB6; // TODO: will update later
+    address public author = 0xF7cC551106A1f4E2843A3DA0C477B6f77FA4a09d; // TODO: only testing now, will update later
 
     uint256 internal constant MAX_UINT112 = 2**112 - 1;
     uint256 internal constant BPS = 10000;

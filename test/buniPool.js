@@ -1,6 +1,6 @@
 const TestToken = artifacts.require('TestToken');
 const BuniCornFactory = artifacts.require('BuniCornFactory');
-const BuniCornPool = artifacts.require('BuniCornPool');
+const MockAuthorBuniCornPool = artifacts.require('MockAuthorBuniCornPool');
 
 const {expectEvent, expectRevert, constants} = require('@openzeppelin/test-helpers');
 const {assert} = require('chai');
@@ -42,13 +42,13 @@ contract('BuniCornPool', function (accounts) {
   });
 
   it('name & symbol', async () => {
-    [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps);
+    [factory, pool] = await setupPool(admin, accounts[0], token0, token1, unamplifiedBps);
     assert(await pool.symbol(), `BPT ${await token0.symbol()} ${await token1.symbol()}`, 'unexpected symbol');
     assert(await pool.name(), `Buni Pool Token ${await token0.symbol()} ${await token1.symbol()}`, 'unexpected name');
   });
 
   it('can not initialize not by factory', async () => {
-    [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps);
+    [factory, pool] = await setupPool(admin, accounts[0], token0, token1, unamplifiedBps);
     await expectRevert(pool.initialize(token0.address, token1.address, unamplifiedBps), 'BUNI: FORBIDDEN');
   });
 
@@ -56,7 +56,7 @@ contract('BuniCornPool', function (accounts) {
     it('unamplified pool', async () => {
       const token0Amount = Helper.expandTo18Decimals(1);
       const token1Amount = Helper.expandTo18Decimals(4);
-      [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps);
+      [factory, pool] = await setupPool(admin, accounts[0], token0, token1, unamplifiedBps);
       await token0.transfer(pool.address, token0Amount);
       await token1.transfer(pool.address, token1Amount);
 
@@ -105,7 +105,7 @@ contract('BuniCornPool', function (accounts) {
       ampBps = new BN(20000);
       const token0Amount = Helper.expandTo18Decimals(1);
       const token1Amount = Helper.expandTo18Decimals(4);
-      [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+      [factory, pool] = await setupPool(admin, accounts[0], token0, token1, ampBps);
       await token0.transfer(pool.address, token0Amount);
       await token1.transfer(pool.address, token1Amount);
 
@@ -175,7 +175,7 @@ contract('BuniCornPool', function (accounts) {
 
       describe(`getInputPrice:${i} unamplified pool`, () => {
         it('can swap when pool is not pause', async () => {
-          [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps);
+          [factory, pool] = await setupPool(admin, accounts[0], token0, token1, unamplifiedBps);
           await addLiquidity(
             liquidityProvider,
             pool,
@@ -189,7 +189,7 @@ contract('BuniCornPool', function (accounts) {
         });
 
         it('cannot swap when pool is paused', async () => {
-          [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps);
+          [factory, pool] = await setupPool(admin, accounts[0], token0, token1, unamplifiedBps);
           await addLiquidity(
             liquidityProvider,
             pool,
@@ -208,7 +208,7 @@ contract('BuniCornPool', function (accounts) {
 
       describe(`getInputPrice:${i} amp pool`, () => {
         it('can swap when pool is not pause', async () => {
-          [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+          [factory, pool] = await setupPool(admin, accounts[0], token0, token1, ampBps);
           await addLiquidity(
             liquidityProvider,
             pool,
@@ -222,7 +222,7 @@ contract('BuniCornPool', function (accounts) {
         });
 
         it('cannot swap when pool is paused', async () => {
-          [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+          [factory, pool] = await setupPool(admin, accounts[0], token0, token1, ampBps);
           await addLiquidity(
             liquidityProvider,
             pool,
@@ -242,7 +242,7 @@ contract('BuniCornPool', function (accounts) {
 
     describe('swap:token0 amp pool', () => {
       it('can swap when pool is not pause', async () => {
-        [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+        [factory, pool] = await setupPool(admin, accounts[0], token0, token1, ampBps);
         const token0Amount = expandTo18Decimals(5);
         const token1Amount = expandTo18Decimals(10);
         const swapAmount = expandTo18Decimals(1);
@@ -298,7 +298,7 @@ contract('BuniCornPool', function (accounts) {
       });
 
       it('cannot swap when pool is paused', async () => {
-        [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+        [factory, pool] = await setupPool(admin, accounts[0], token0, token1, ampBps);
         const token0Amount = expandTo18Decimals(5);
         const token1Amount = expandTo18Decimals(10);
         const swapAmount = expandTo18Decimals(1);
@@ -333,7 +333,7 @@ contract('BuniCornPool', function (accounts) {
 
     describe('swap:token0 unamplified pool', () => {
       it('can swap when pool is not pause', async () => {
-        [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps);
+        [factory, pool] = await setupPool(admin, accounts[0], token0, token1, unamplifiedBps);
         const token0Amount = expandTo18Decimals(5);
         const token1Amount = expandTo18Decimals(10);
         const swapAmount = expandTo18Decimals(1);
@@ -392,7 +392,7 @@ contract('BuniCornPool', function (accounts) {
       });
 
       it('cannot swap when pool is paused', async () => {
-        [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps);
+        [factory, pool] = await setupPool(admin, accounts[0], token0, token1, unamplifiedBps);
         const token0Amount = expandTo18Decimals(5);
         const token1Amount = expandTo18Decimals(10);
         const swapAmount = expandTo18Decimals(1);
@@ -428,7 +428,7 @@ contract('BuniCornPool', function (accounts) {
     [20000, 50000, 200000, 1000000].forEach(ampBPS => {
       describe(`swap: token0 stable pool ampBPS = ${ampBPS}`, () => {
         it('can swap when pool is not pause', async () => {
-          [factory, pool] = await setupPool(admin, token0, token1, new BN(ampBPS));
+          [factory, pool] = await setupPool(admin, accounts[0], token0, token1, new BN(ampBPS));
           const token0Amount = expandTo18Decimals(10);
           const token1Amount = expandTo18Decimals(10);
           const swapAmount = expandTo18Decimals(1);
@@ -460,7 +460,7 @@ contract('BuniCornPool', function (accounts) {
         });
 
         it('cannot swap when pool is paused', async () => {
-          [factory, pool] = await setupPool(admin, token0, token1, new BN(ampBPS));
+          [factory, pool] = await setupPool(admin, accounts[0], token0, token1, new BN(ampBPS));
           const token0Amount = expandTo18Decimals(10);
           const token1Amount = expandTo18Decimals(10);
           const swapAmount = expandTo18Decimals(1);
@@ -492,7 +492,7 @@ contract('BuniCornPool', function (accounts) {
         });
       });
       it(`swap: token0 stable pool ampBPS = ${ampBPS}`, async () => {
-        [factory, pool] = await setupPool(admin, token0, token1, new BN(ampBPS));
+        [factory, pool] = await setupPool(admin, accounts[0], token0, token1, new BN(ampBPS));
         const token0Amount = expandTo18Decimals(10);
         const token1Amount = expandTo18Decimals(10);
         const swapAmount = expandTo18Decimals(1);
@@ -515,7 +515,7 @@ contract('BuniCornPool', function (accounts) {
 
       describe(`swap: token1 stable pool ampBPS = ${ampBPS}`, () => {
         it('can swap when pool is not pause', async () => {
-          [factory, pool] = await setupPool(admin, token0, token1, new BN(ampBPS));
+          [factory, pool] = await setupPool(admin, accounts[0], token0, token1, new BN(ampBPS));
           const token0Amount = expandTo18Decimals(10);
           const token1Amount = expandTo18Decimals(10);
           const swapAmount = expandTo18Decimals(1);
@@ -547,7 +547,7 @@ contract('BuniCornPool', function (accounts) {
         });
 
         it('cannot swap when pool is paused', async () => {
-          [factory, pool] = await setupPool(admin, token0, token1, new BN(ampBPS));
+          [factory, pool] = await setupPool(admin, accounts[0], token0, token1, new BN(ampBPS));
           const token0Amount = expandTo18Decimals(10);
           const token1Amount = expandTo18Decimals(10);
           const swapAmount = expandTo18Decimals(1);
@@ -572,7 +572,7 @@ contract('BuniCornPool', function (accounts) {
 
     describe('swap:token1 amp pool', () => {
       it('can swap when pool is not pause', async () => {
-        [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+        [factory, pool] = await setupPool(admin, accounts[0], token0, token1, ampBps);
         const token0Amount = expandTo18Decimals(5);
         const token1Amount = expandTo18Decimals(10);
         await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
@@ -608,7 +608,7 @@ contract('BuniCornPool', function (accounts) {
       });
 
       it('cannot swap when pool is paused', async () => {
-        [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+        [factory, pool] = await setupPool(admin, accounts[0], token0, token1, ampBps);
         const token0Amount = expandTo18Decimals(5);
         const token1Amount = expandTo18Decimals(10);
         await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
@@ -626,7 +626,7 @@ contract('BuniCornPool', function (accounts) {
 
     describe('swap:token1 unamplified pool', () => {
       it('can swap when pool is not pause', async () => {
-        [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps, new BN(0));
+        [factory, pool] = await setupPool(admin, accounts[0], token0, token1, unamplifiedBps, new BN(0));
         const token0Amount = expandTo18Decimals(5);
         const token1Amount = expandTo18Decimals(10);
         await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
@@ -664,7 +664,7 @@ contract('BuniCornPool', function (accounts) {
       });
 
       it('cannot swap when pool is paused', async () => {
-        [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps, new BN(0));
+        [factory, pool] = await setupPool(admin, accounts[0], token0, token1, unamplifiedBps, new BN(0));
         const token0Amount = expandTo18Decimals(5);
         const token1Amount = expandTo18Decimals(10);
         await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
@@ -728,7 +728,7 @@ contract('BuniCornPool', function (accounts) {
   describe('burn', async () => {
     describe('unamplified pool', () => {
       it('can burn when pool is not pause', async () => {
-        [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps);
+        [factory, pool] = await setupPool(admin, accounts[0], token0, token1, unamplifiedBps);
         const token0Amount = expandTo18Decimals(3);
         const token1Amount = expandTo18Decimals(3);
         await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
@@ -771,7 +771,7 @@ contract('BuniCornPool', function (accounts) {
       });
 
       it('cannot burn when pool is paused', async () => {
-        [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps);
+        [factory, pool] = await setupPool(admin, accounts[0], token0, token1, unamplifiedBps);
         const token0Amount = expandTo18Decimals(3);
         const token1Amount = expandTo18Decimals(3);
         await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
@@ -791,7 +791,7 @@ contract('BuniCornPool', function (accounts) {
 
     describe('amp pool', () => {
       it('can burn when pool is not pause', async () => {
-        [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+        [factory, pool] = await setupPool(admin, accounts[0], token0, token1, ampBps);
         const token0Amount = expandTo18Decimals(1);
         const token1Amount = expandTo18Decimals(4);
         await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
@@ -836,7 +836,7 @@ contract('BuniCornPool', function (accounts) {
       });
 
       it('cannot burn when pool is paused', async () => {
-        [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+        [factory, pool] = await setupPool(admin, accounts[0], token0, token1, ampBps);
         const token0Amount = expandTo18Decimals(1);
         const token1Amount = expandTo18Decimals(4);
         await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
@@ -862,7 +862,7 @@ contract('BuniCornPool', function (accounts) {
       const token1Amount = expandTo18Decimals(1000);
       const governmentFeeBps = new BN(1000);
 
-      [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps);
+      [factory, pool] = await setupPool(admin, accounts[0], token0, token1, unamplifiedBps);
       await factory.setFeeConfiguration(feeTo, governmentFeeBps, {from: admin});
       await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
       let totalSuppy = await pool.totalSupply();
@@ -911,7 +911,7 @@ contract('BuniCornPool', function (accounts) {
       const vToken1Amount = token1Amount.mul(ampBps).div(Helper.BPS);
       const governmentFeeBps = new BN(1000);
 
-      [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+      [factory, pool] = await setupPool(admin, accounts[0], token0, token1, ampBps);
       await factory.setFeeConfiguration(feeTo, governmentFeeBps, {from: admin});
       await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
       let totalSuppy = await pool.totalSupply();
@@ -954,7 +954,7 @@ contract('BuniCornPool', function (accounts) {
     });
 
     it('feeTo:off unamplified pool', async () => {
-      [factory, pool] = await setupPool(admin, token0, token1, unamplifiedBps);
+      [factory, pool] = await setupPool(admin, accounts[0], token0, token1, unamplifiedBps);
 
       const token0Amount = expandTo18Decimals(1000);
       const token1Amount = expandTo18Decimals(1000);
@@ -978,7 +978,7 @@ contract('BuniCornPool', function (accounts) {
     });
 
     it('feeTo:off amp pool', async () => {
-      [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+      [factory, pool] = await setupPool(admin, accounts[0], token0, token1, ampBps);
 
       const token0Amount = expandTo18Decimals(1000);
       const token1Amount = expandTo18Decimals(1000);
@@ -998,7 +998,7 @@ contract('BuniCornPool', function (accounts) {
 
   describe('sync', async () => {
     it('case 1: donation from 1 side', async () => {
-      [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+      [factory, pool] = await setupPool(admin, accounts[0], token0, token1, ampBps);
 
       const token0Amount = expandTo18Decimals(1);
       const token1Amount = expandTo18Decimals(1);
@@ -1017,7 +1017,7 @@ contract('BuniCornPool', function (accounts) {
     });
 
     it('case 2: donation from 2 side -> reserve data should scale up', async () => {
-      [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+      [factory, pool] = await setupPool(admin, accounts[0], token0, token1, ampBps);
 
       const token0Amount = expandTo18Decimals(1);
       const token1Amount = expandTo18Decimals(1);
@@ -1037,7 +1037,7 @@ contract('BuniCornPool', function (accounts) {
   });
 
   it('skim', async () => {
-    [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+    [factory, pool] = await setupPool(admin, accounts[0], token0, token1, ampBps);
     const token0Amount = expandTo18Decimals(1000);
     const token1Amount = expandTo18Decimals(1000);
     await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
@@ -1061,7 +1061,7 @@ contract('BuniCornPool', function (accounts) {
 
   describe('pause', () => {
     it('can pause when caller is author', async () => {
-      [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+      [factory, pool] = await setupPool(admin, accounts[0], token0, token1, ampBps);
       const result = await pool.pause({ from: accounts[0] });
       expectEvent(result, 'Paused', {
         account: accounts[0]
@@ -1069,7 +1069,7 @@ contract('BuniCornPool', function (accounts) {
     });
 
     it('cannot pause when caller is not author', async () => {
-      [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+      [factory, pool] = await setupPool(admin, accounts[0], token0, token1, ampBps);
       // should revert
       await expectRevert(pool.pause({ from: accounts[1] }), 'BUNI: caller is not the author');
     });
@@ -1077,7 +1077,7 @@ contract('BuniCornPool', function (accounts) {
 
   describe('unpause', () => {
     it('can unpause when caller is author', async () => {
-      [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+      [factory, pool] = await setupPool(admin, accounts[0], token0, token1, ampBps);
       // author pause first
       await pool.pause({ from: accounts[0] });
       // author unpause then
@@ -1088,7 +1088,7 @@ contract('BuniCornPool', function (accounts) {
     });
 
     it('cannot pause when caller is not author', async () => {
-      [factory, pool] = await setupPool(admin, token0, token1, ampBps);
+      [factory, pool] = await setupPool(admin, accounts[0], token0, token1, ampBps);
       // author pause first
       await pool.pause({ from: accounts[0] });
       // should revert
@@ -1116,12 +1116,10 @@ async function setupFactory (admin) {
   return await BuniCornFactory.new(admin, { from: owner });
 }
 
-async function setupPool (admin, tokenA, tokenB, ampBps) {
+async function setupPool (admin, author, tokenA, tokenB, ampBps) {
   let factory = await setupFactory(admin);
-
-  await factory.createPool(tokenA.address, tokenB.address, ampBps, { from: owner });
-  const poolAddrs = await factory.getPools(tokenA.address, tokenB.address);
-  const pool = await BuniCornPool.at(poolAddrs[0]);
+  const pool = await MockAuthorBuniCornPool.new(factory.address, tokenA.address, tokenB.address, ampBps);
+  await pool.mockAuthor(author);
 
   return [factory, pool];
 }
