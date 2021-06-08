@@ -59,8 +59,6 @@
     "typescript": "3.9.7",
     "web3": "1.2.6",
     "@uniswap/lib": "1.1.1",
-    "@uniswap/v2-core": "1.0.1",
-    "@uniswap/v2-periphery": "git@github.com:sotatek-dev/buni-stable-coins-v2-periphery.git",
     "ethers": "5.0.0",
     "web3-eth-abi": "1.2.11"
   },

@@ -9,7 +9,6 @@ const {ecsign} = require('ethereumjs-util');
 const BuniCornRouter = artifacts.require('BuniCornRouter02');
 const BuniCornFactory = artifacts.require('BuniCornFactory');
 const BuniCornPool = artifacts.require('BuniCornPool');
-const WBNB = artifacts.require('WBNB9');
 const TestToken = artifacts.require('TestToken');
 
 contract('test', async accounts => {

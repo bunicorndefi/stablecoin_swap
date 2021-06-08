@@ -101,20 +101,20 @@ contract BuniCornPool is IBuniCornPool, ERC20Permit, ReentrancyGuard, VolumeTren
         if (_totalSupply == 0) {
             if (isAmpPool) {
                 uint32 _ampBps = ampBps;
-                _data.vReserve0 = _data.reserve0.mul(_ampBps) / BPS;
-                _data.vReserve1 = _data.reserve1.mul(_ampBps) / BPS;
+                _data.vReserve0 = _data.reserve0.mul(_ampBps).div(BPS);
+                _data.vReserve1 = _data.reserve1.mul(_ampBps).div(BPS);
             }
             liquidity = MathExt.sqrt(amount0.mul(amount1)).sub(MINIMUM_LIQUIDITY);
             _mint(address(-1), MINIMUM_LIQUIDITY); // permanently lock the first MINIMUM_LIQUIDITY tokens
         } else {
             liquidity = Math.min(
-                amount0.mul(_totalSupply) / data.reserve0,
-                amount1.mul(_totalSupply) / data.reserve1
+                amount0.mul(_totalSupply).div(data.reserve0),
+                amount1.mul(_totalSupply).div(data.reserve1)
             );
             if (isAmpPool) {
                 uint256 b = liquidity.add(_totalSupply);
-                _data.vReserve0 = Math.max(data.vReserve0.mul(b) / _totalSupply, _data.reserve0);
-                _data.vReserve1 = Math.max(data.vReserve1.mul(b) / _totalSupply, _data.reserve1);
+                _data.vReserve0 = Math.max(data.vReserve0.mul(b).div(_totalSupply), _data.reserve0);
+                _data.vReserve1 = Math.max(data.vReserve1.mul(b).div(_totalSupply), _data.reserve1);
             }
         }
         require(liquidity > 0, "BUNI: INSUFFICIENT_LIQUIDITY_MINTED");
@@ -146,8 +146,8 @@ contract BuniCornPool is IBuniCornPool, ERC20Permit, ReentrancyGuard, VolumeTren
 
         bool feeOn = _mintFee(isAmpPool, data);
         uint256 _totalSupply = totalSupply(); // gas savings, must be defined here since totalSupply can update in _mintFee
-        amount0 = liquidity.mul(balance0) / _totalSupply; // using balances ensures pro-rata distribution
-        amount1 = liquidity.mul(balance1) / _totalSupply; // using balances ensures pro-rata distribution
+        amount0 = liquidity.mul(balance0).div(_totalSupply); // using balances ensures pro-rata distribution
+        amount1 = liquidity.mul(balance1).div(_totalSupply); // using balances ensures pro-rata distribution
         require(amount0 > 0 && amount1 > 0, "BUNI: INSUFFICIENT_LIQUIDITY_BURNED");
         _burn(address(this), liquidity);
         _token0.safeTransfer(to, amount0);
@@ -157,11 +157,11 @@ contract BuniCornPool is IBuniCornPool, ERC20Permit, ReentrancyGuard, VolumeTren
         _data.reserve1 = _token1.balanceOf(address(this));
         if (isAmpPool) {
             uint256 b = Math.min(
-                _data.reserve0.mul(_totalSupply) / data.reserve0,
-                _data.reserve1.mul(_totalSupply) / data.reserve1
+                _data.reserve0.mul(_totalSupply).div(data.reserve0),
+                _data.reserve1.mul(_totalSupply).div(data.reserve1)
             );
-            _data.vReserve0 = Math.max(data.vReserve0.mul(b) / _totalSupply, _data.reserve0);
-            _data.vReserve1 = Math.max(data.vReserve1.mul(b) / _totalSupply, _data.reserve1);
+            _data.vReserve0 = Math.max(data.vReserve0.mul(b).div(_totalSupply), _data.reserve0);
+            _data.vReserve1 = Math.max(data.vReserve1.mul(b).div(_totalSupply), _data.reserve1);
         }
         _update(isAmpPool, _data);
         if (feeOn) kLast = getK(isAmpPool, _data); // data are up-to-date
@@ -200,11 +200,11 @@ contract BuniCornPool is IBuniCornPool, ERC20Permit, ReentrancyGuard, VolumeTren
                 newData.vReserve1 = data.vReserve1.add(newData.reserve1).sub(data.reserve1);
             }
         }
-        uint256 amount0In = newData.reserve0 > data.reserve0 - amount0Out
-            ? newData.reserve0 - (data.reserve0 - amount0Out)
+        uint256 amount0In = newData.reserve0 > data.reserve0.sub(amount0Out)
+            ? newData.reserve0.sub(data.reserve0.sub(amount0Out))
             : 0;
-        uint256 amount1In = newData.reserve1 > data.reserve1 - amount1Out
-            ? newData.reserve1 - (data.reserve1 - amount1Out)
+        uint256 amount1In = newData.reserve1 > data.reserve1.sub(amount1Out)
+            ? newData.reserve1.sub(data.reserve1.sub(amount1Out))
             : 0;
         require(amount0In > 0 || amount1In > 0, "BUNI: INSUFFICIENT_INPUT_AMOUNT");
         uint256 feeInPrecision = verifyBalanceAndUpdateEma(
@@ -220,12 +220,6 @@ contract BuniCornPool is IBuniCornPool, ERC20Permit, ReentrancyGuard, VolumeTren
         emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to, feeInPrecision);
     }
 
-    /// @dev force balances to match reserves
-    function skim(address to) external nonReentrant {
-        token0.safeTransfer(to, token0.balanceOf(address(this)).sub(reserve0));
-        token1.safeTransfer(to, token1.balanceOf(address(this)).sub(reserve1));
-    }
-
     /// @dev force reserves to match balances
     function sync() external override nonReentrant {
         (bool isAmpPool, ReserveData memory data) = getReservesData();
@@ -237,11 +231,11 @@ contract BuniCornPool is IBuniCornPool, ERC20Permit, ReentrancyGuard, VolumeTren
         if (isAmpPool) {
             uint256 _totalSupply = totalSupply();
             uint256 b = Math.min(
-                newData.reserve0.mul(_totalSupply) / data.reserve0,
-                newData.reserve1.mul(_totalSupply) / data.reserve1
+                newData.reserve0.mul(_totalSupply).div(data.reserve0),
+                newData.reserve1.mul(_totalSupply).div(data.reserve1)
             );
-            newData.vReserve0 = Math.max(data.vReserve0.mul(b) / _totalSupply, newData.reserve0);
-            newData.vReserve1 = Math.max(data.vReserve1.mul(b) / _totalSupply, newData.reserve1);
+            newData.vReserve0 = Math.max(data.vReserve0.mul(b).div(_totalSupply), newData.reserve0);
+            newData.vReserve1 = Math.max(data.vReserve1.mul(b).div(_totalSupply), newData.reserve1);
         }
         _update(isAmpPool, newData);
         if (feeOn) kLast = getK(isAmpPool, newData);
@@ -308,10 +302,10 @@ contract BuniCornPool is IBuniCornPool, ERC20Permit, ReentrancyGuard, VolumeTren
         // verify balance update matches with fomula
         uint256 balance0Adjusted = afterReserve0.mul(PRECISION);
         balance0Adjusted = balance0Adjusted.sub(amount0In.mul(feeInPrecision));
-        balance0Adjusted = balance0Adjusted / PRECISION;
+        balance0Adjusted = balance0Adjusted.div(PRECISION);
         uint256 balance1Adjusted = afterReserve1.mul(PRECISION);
         balance1Adjusted = balance1Adjusted.sub(amount1In.mul(feeInPrecision));
-        balance1Adjusted = balance1Adjusted / PRECISION;
+        balance1Adjusted = balance1Adjusted.div(PRECISION);
         require(
             balance0Adjusted.mul(balance1Adjusted) >= beforeReserve0.mul(beforeReserve1),
             "BUNI: K"
@@ -344,7 +338,7 @@ contract BuniCornPool is IBuniCornPool, ERC20Permit, ReentrancyGuard, VolumeTren
                         governmentFeeBps
                     );
                     uint256 denominator = rootK.add(rootKLast).mul(5000);
-                    uint256 liquidity = numerator / denominator;
+                    uint256 liquidity = numerator.div(denominator);
                     if (liquidity > 0) _mint(feeTo, liquidity);
                 }
             }
@@ -368,16 +362,16 @@ contract BuniCornPool is IBuniCornPool, ERC20Permit, ReentrancyGuard, VolumeTren
         if (_ampBps <= 20000) {
             return feeInPrecision;
         } else if (_ampBps <= 50000) {
-            return (feeInPrecision * 20) / 30;
+            return feeInPrecision.mul(20).div(30);
         } else if (_ampBps <= 200000) {
-            return (feeInPrecision * 10) / 30;
+            return feeInPrecision.mul(10).div(30);
         } else {
-            return (feeInPrecision * 4) / 30;
+            return feeInPrecision.mul(4).div(30);
         }
     }
 
     function getK(bool isAmpPool, ReserveData memory data) internal pure returns (uint256) {
-        return isAmpPool ? data.vReserve0 * data.vReserve1 : data.reserve0 * data.reserve1;
+        return isAmpPool ? data.vReserve0.mul(data.vReserve1) : data.reserve0.mul(data.reserve1);
     }
 
     function safeUint112(uint256 x) internal pure returns (uint112) {

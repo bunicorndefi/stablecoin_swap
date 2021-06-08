@@ -10,7 +10,7 @@ async function main () {
   const factory = await BuniCornFactory.new(accounts[0]);
   console.log('Factory deployed to:', factory.address);
 
-  const router = await BuniCornRouter02.new(factory.address, metadata.wbnb);
+  const router = await BuniCornRouter02.new(factory.address);
   console.log('Router deployed to:', router.address);
 
   await factory.setRouter(router.address);

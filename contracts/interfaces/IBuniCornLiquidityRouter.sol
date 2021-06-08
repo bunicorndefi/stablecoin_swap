@@ -54,52 +54,6 @@ interface IBuniCornLiquidityRouter {
             uint256 liquidity
         );
 
-    function addLiquidityNewPoolBNB(
-        IERC20 token,
-        uint32 ampBps,
-        uint256 amountTokenDesired,
-        uint256 amountTokenMin,
-        uint256 amountBNBMin,
-        address to,
-        uint256 deadline
-    )
-        external
-        payable
-        returns (
-            uint256 amountToken,
-            uint256 amountBNB,
-            uint256 liquidity
-        );
-
-    /**
-     * @param token address of token in the pool
-     * @param pool the address of the pool
-     * @param amountTokenDesired the amount of token users want to add to the pool
-     * @dev   msg.value equals to amountEthDesired
-     * @param amountTokenMin bounds to the extents to which WETH/token can go up
-     * @param amountBNBMin bounds to the extents to which WETH/token can go down
-     * @param vReserveRatioBounds bounds to the extents to which vReserveB/vReserveA can go (precision: 2 ** 112)
-     * @param to Recipient of the liquidity tokens.
-     * @param deadline Unix timestamp after which the transaction will revert.
-     */
-    function addLiquidityBNB(
-        IERC20 token,
-        address pool,
-        uint256 amountTokenDesired,
-        uint256 amountTokenMin,
-        uint256 amountBNBMin,
-        uint256[2] calldata vReserveRatioBounds,
-        address to,
-        uint256 deadline
-    )
-        external
-        payable
-        returns (
-            uint256 amountToken,
-            uint256 amountBNB,
-            uint256 liquidity
-        );
-
     /**
      * @param tokenA address of token in the pool
      * @param tokenB address of token in the pool
@@ -147,50 +101,6 @@ interface IBuniCornLiquidityRouter {
         bytes32 r,
         bytes32 s
     ) external returns (uint256 amountA, uint256 amountB);
-
-    /**
-     * @param token address of token in the pool
-     * @param pool the address of the pool
-     * @param liquidity the amount of lp token users want to burn
-     * @param amountTokenMin the minimum token retuned after burning
-     * @param amountBNBMin the minimum eth in wei retuned after burning
-     * @param to Recipient of the returned tokens.
-     * @param deadline Unix timestamp after which the transaction will revert
-     */
-    function removeLiquidityBNB(
-        IERC20 token,
-        address pool,
-        uint256 liquidity,
-        uint256 amountTokenMin,
-        uint256 amountBNBMin,
-        address to,
-        uint256 deadline
-    ) external returns (uint256 amountToken, uint256 amountBNB);
-
-    /**
-     * @param token address of token in the pool
-     * @param pool the address of the pool
-     * @param liquidity the amount of lp token users want to burn
-     * @param amountTokenMin the minimum token retuned after burning
-     * @param amountBNBMin the minimum eth in wei retuned after burning
-     * @param to Recipient of the returned tokens.
-     * @param deadline Unix timestamp after which the transaction will revert
-     * @param approveMax whether users permit the router spending max lp token
-     * @param r s v signatures of user to permit the router spending lp token.
-     */
-    function removeLiquidityBNBWithPermit(
-        IERC20 token,
-        address pool,
-        uint256 liquidity,
-        uint256 amountTokenMin,
-        uint256 amountBNBMin,
-        address to,
-        uint256 deadline,
-        bool approveMax,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external returns (uint256 amountToken, uint256 amountBNB);
 
     /**
      * @param amountA amount of 1 side token added to the pool

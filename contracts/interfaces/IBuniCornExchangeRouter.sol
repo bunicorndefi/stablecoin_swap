@@ -23,40 +23,6 @@ interface IBuniCornExchangeRouter {
         uint256 deadline
     ) external returns (uint256[] memory amounts);
 
-    function swapExactBNBForTokens(
-        uint256 amountOutMin,
-        address[] calldata poolsPath,
-        IERC20[] calldata path,
-        address to,
-        uint256 deadline
-    ) external payable returns (uint256[] memory amounts);
-
-    function swapTokensForExactBNB(
-        uint256 amountOut,
-        uint256 amountInMax,
-        address[] calldata poolsPath,
-        IERC20[] calldata path,
-        address to,
-        uint256 deadline
-    ) external returns (uint256[] memory amounts);
-
-    function swapExactTokensForBNB(
-        uint256 amountIn,
-        uint256 amountOutMin,
-        address[] calldata poolsPath,
-        IERC20[] calldata path,
-        address to,
-        uint256 deadline
-    ) external returns (uint256[] memory amounts);
-
-    function swapBNBForExactTokens(
-        uint256 amountOut,
-        address[] calldata poolsPath,
-        IERC20[] calldata path,
-        address to,
-        uint256 deadline
-    ) external payable returns (uint256[] memory amounts);
-
     function getAmountsOut(
         uint256 amountIn,
         address[] calldata poolsPath,

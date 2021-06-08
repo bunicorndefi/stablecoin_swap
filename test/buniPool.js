@@ -1036,29 +1036,6 @@ contract('BuniCornPool', function (accounts) {
     });
   });
 
-  it('skim', async () => {
-    [factory, pool] = await setupPool(admin, accounts[0], token0, token1, ampBps);
-    const token0Amount = expandTo18Decimals(1000);
-    const token1Amount = expandTo18Decimals(1000);
-    await addLiquidity(liquidityProvider, pool, token0Amount, token1Amount);
-
-    token0.transfer(pool.address, expandTo18Decimals(1));
-    let beforeBalance = await token0.balanceOf(trader);
-    await pool.skim(trader);
-    let afterBalance = await token0.balanceOf(trader);
-    Helper.assertEqual(afterBalance.sub(beforeBalance), expandTo18Decimals(1));
-
-    let tradeInfo = await pool.getTradeInfo();
-    Helper.assertEqual(tradeInfo._reserve0, expandTo18Decimals(1000));
-    Helper.assertEqual(tradeInfo._reserve1, expandTo18Decimals(1000));
-    Helper.assertEqual(tradeInfo._vReserve0, expandTo18Decimals(2000));
-    Helper.assertEqual(tradeInfo._vReserve1, expandTo18Decimals(2000));
-    // test case overflow
-    await token0.transfer(pool.address, new BN(2).pow(new BN(112)));
-    await expectRevert(pool.sync(), 'BUNI: OVERFLOW');
-    await pool.skim(trader);
-  });
-
   describe('pause', () => {
     it('can pause when caller is author', async () => {
       [factory, pool] = await setupPool(admin, accounts[0], token0, token1, ampBps);

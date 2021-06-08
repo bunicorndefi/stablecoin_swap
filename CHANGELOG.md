@@ -13,7 +13,7 @@ But there is only 1 pool with amplification factor = 1
     - When users swap from A->B->C, users must specify which pools they choose to swap with at router contract.   
 Router contract will also check if these pools are created from factory contract.
     - For add/remove liquidity, users must specify which pools they choose to add/remove liquidity.   
-To add liquidity to a new pool, users would use function `addLiquidityNewPool` and `addLiquidityNewPoolBNB`  
+To add liquidity to a new pool, users would use function `addLiquidityNewPool`
 - Change in fee:
   - We divide token pools into 4 categories. In general, the higher amplification used indicate greater price stability, so we use lower base fees.
     - Similar assets pools(amplificationFactor > 20): baseFee = 4 bps
